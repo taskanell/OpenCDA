@@ -12,6 +12,7 @@ from opencda.core.common.cav_world import CavWorld
 from opencda.scenario_testing.evaluations.evaluate_manager import \
     EvaluationManager
 from opencda.scenario_testing.utils.yaml_utils import add_current_time
+from opencda.customize.msvan3t.msvan3t_agent import Msvan3tAgent
 
 
 def run_scenario(opt, scenario_params):
@@ -45,6 +46,10 @@ def run_scenario(opt, scenario_params):
                               script_name='single_2lanefree_cosim',
                               current_time=scenario_params['current_time'])
 
+        msvan3tAgent = Msvan3tAgent(cav_world,
+                                    cav_list=single_cav_list,
+                                    cosim_manager=scenario_manager)
+
         spectator = scenario_manager.world.get_spectator()
 
         while True:
@@ -57,7 +62,7 @@ def run_scenario(opt, scenario_params):
                                                     carla.Rotation(pitch=-90)))
 
             for i, single_cav in enumerate(single_cav_list):
-                single_cav.update_info()
+                single_cav.update_info_LDM()
                 control = single_cav.run_step()
                 single_cav.vehicle.apply_control(control)
 

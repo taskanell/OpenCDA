@@ -11,6 +11,8 @@ from opencda.scenario_testing.evaluations.evaluate_manager import \
 from opencda.scenario_testing.utils.yaml_utils import add_current_time
 
 
+
+
 def run_scenario(opt, scenario_params):
     try:
         scenario_params = add_current_time(scenario_params)
@@ -36,6 +38,7 @@ def run_scenario(opt, scenario_params):
         traffic_manager, bg_veh_list = \
             scenario_manager.create_traffic_carla()
 
+
         # create evaluation manager
         eval_manager = \
             EvaluationManager(scenario_manager.cav_world,
@@ -56,7 +59,7 @@ def run_scenario(opt, scenario_params):
                     90)))
 
             for i, single_cav in enumerate(single_cav_list):
-                single_cav.update_info()
+                single_cav.update_info_LDM()
                 control = single_cav.run_step()
                 single_cav.vehicle.apply_control(control)
 

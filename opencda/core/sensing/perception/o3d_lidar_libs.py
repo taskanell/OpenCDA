@@ -9,9 +9,8 @@ and processing by utilizing open3d.
 
 import time
 
-import open3d as o3d
 import numpy as np
-
+import open3d as o3d
 from matplotlib import cm
 from scipy.stats import mode
 
@@ -98,8 +97,8 @@ def o3d_visualizer_init(actor_id):
     """
     vis = o3d.visualization.Visualizer()
     vis.create_window(window_name=str(actor_id),
-                      width=480,
-                      height=320,
+                      width=800,
+                      height=800,
                       left=480,
                       top=270)
     vis.get_render_option().background_color = [0.05, 0.05, 0.05]
@@ -109,12 +108,85 @@ def o3d_visualizer_init(actor_id):
     return vis
 
 
-def o3d_visualizer_show(vis, count, point_cloud, objects):
+def o3d_visualizer_show(vis, count, point_cloud, objects, LDM=False):
     """
     Visualize the point cloud at runtime.
 
     Parameters
     ----------
+    LDM
+    vis : o3d.Visualizer
+        Visualization interface.
+
+    count : int
+        Current step since simulation started.
+
+    point_cloud : o3d.PointCloud
+        Open3d point cloud.
+
+    objects : dict
+        The dictionary containing objects.
+
+    Returns
+    -------
+
+    """
+    point_cloud.paint_uniform_color([0, 1, 1])
+    if count == 2:
+        vis.add_geometry(point_cloud)
+
+    vis.update_geometry(point_cloud)
+
+    LDM_geometries = []
+    for key, object_list in objects.items():
+        # we only draw vehicles for now
+        if key != 'vehicles':
+            continue
+        for object_ in object_list:
+            if LDM is True:
+                # min_arr = object_.min.reshape((3, 1))
+                # max_arr = object_.max.reshape((3, 1))
+                # min_bound = min_arr.astype(np.float64)
+                # max_bound = max_arr.astype(np.float64)
+                # geometry = o3d.geometry.AxisAlignedBoundingBox(min_bound, max_bound)
+                geometry = object_.o3d_bbx
+                if object_.detected:
+                    geometry.color = (0, 1, 0)
+                else:
+                    geometry.color = (0, 1, 1)
+                vis.add_geometry(geometry)
+                LDM_geometries.append(geometry)
+            else:
+                aabb = object_.o3d_bbx
+                vis.add_geometry(aabb)
+
+    min = np.array([1, 1, 1])
+    max = np.array([2, 2, 2])
+
+    vis.poll_events()
+    vis.update_renderer()
+    # # This can fix Open3D jittering issues:
+    time.sleep(0.001)
+
+    for key, object_list in objects.items():
+        if key != 'vehicles':
+            continue
+        for object_ in object_list:
+            aabb = object_.o3d_bbx
+            vis.remove_geometry(aabb)
+
+    for geometry in LDM_geometries:
+        vis.remove_geometry(geometry)
+
+
+def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
+    """
+    Visualize the point cloud at runtime.
+
+    Parameters
+    ----------
+    groundTruth
+    LDM
     vis : o3d.Visualizer
         Visualization interface.
 
@@ -132,30 +204,45 @@ def o3d_visualizer_show(vis, count, point_cloud, objects):
 
     """
 
-    if count == 2:
+    if count == 10:
         vis.add_geometry(point_cloud)
 
     vis.update_geometry(point_cloud)
 
+    LDM_geometries = []
     for key, object_list in objects.items():
         # we only draw vehicles for now
         if key != 'vehicles':
             continue
         for object_ in object_list:
-            aabb = object_.o3d_bbx
-            vis.add_geometry(aabb)
+            geometry = object_.perception.o3d_bbx
+            if object_.detected and object_.onSight:
+                geometry.color = (0, 1, 0)
+            elif not object_.detected:
+                geometry.color = (1, 0, 1)
+            else:
+                geometry.color = (1, 0, 0)
+            vis.add_geometry(geometry)
+
+            LDM_geometries.append(geometry)
+
+    for key, object_list in groundTruth.items():
+        # we only draw vehicles for now
+        if key != 'vehicles':
+            continue
+        for object_ in object_list:
+            geometry = object_.o3d_bbx
+            geometry.color = (0, 0, 1)
+            vis.add_geometry(geometry)
+            LDM_geometries.append(geometry)
 
     vis.poll_events()
     vis.update_renderer()
     # # This can fix Open3D jittering issues:
     time.sleep(0.001)
 
-    for key, object_list in objects.items():
-        if key != 'vehicles':
-            continue
-        for object_ in object_list:
-            aabb = object_.o3d_bbx
-            vis.remove_geometry(aabb)
+    for geometry in LDM_geometries:
+        vis.remove_geometry(geometry)
 
 
 def o3d_camera_lidar_fusion(objects,
@@ -200,7 +287,7 @@ def o3d_camera_lidar_fusion(objects,
     for i in range(yolo_bbx.shape[0]):
         detection = yolo_bbx[i]
         # 2d bbx coordinates
-        x1, y1, x2, y2 = int(detection[0]), int(detection[1]),\
+        x1, y1, x2, y2 = int(detection[0]), int(detection[1]), \
             int(detection[2]), int(detection[3])
         label = int(detection[5])
 
@@ -236,9 +323,10 @@ def o3d_camera_lidar_fusion(objects,
         # create o3d.PointCloud object
         o3d_pointcloud = o3d.geometry.PointCloud()
         o3d_pointcloud.points = o3d.utility.Vector3dVector(select_points)
+        o3d_pointcloud.paint_uniform_color([0, 1, 1])
         # add o3d bounding box
         aabb = o3d_pointcloud.get_axis_aligned_bounding_box()
-        aabb.color = (0, 1, 0)
+        aabb.color = (1, 0, 0)
 
         # get the eight corner of the bounding boxes.
         corner = np.asarray(aabb.get_box_points())

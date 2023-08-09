@@ -5,4 +5,9 @@
     <route-files value="Town06.rou.xml"/>
   </input>
   <num-clients value="1"/>
+  <time>
+    <begin value="0"/>
+    <end value="300"/>
+    <step-length value="0.01"/>
+  </time>
 </configuration>

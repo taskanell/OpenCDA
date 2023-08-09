@@ -261,3 +261,32 @@ def get_speed_sumo(sumo2carla_ids, carla_id):
             return vehicle_speed
 
     return -1
+
+def get_angle_sumo(sumo2carla_ids, carla_id):
+    """
+    Get the speed of the vehicles controlled by sumo.
+
+    Parameters
+    ----------
+    sumo2carla_ids : dict
+        Sumo-carla mapping dictionary.
+
+    carla_id : int
+        Carla actor id.
+
+    Returns
+    -------
+    speed : float
+        The speed retrieved from the sumo server, -1 if the carla_id not
+        found.
+    """
+    # python will only import this once and then save it in cache. so the
+    # efficiency won't affected during the loop.
+    traci = importlib.import_module("traci")
+
+    for key, value in sumo2carla_ids.items():
+        if int(value) == carla_id:
+            vehicle_angle = traci.vehicle.getAngle(key)
+            return vehicle_angle
+
+    return -1

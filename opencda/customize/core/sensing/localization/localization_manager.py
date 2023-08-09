@@ -9,6 +9,7 @@ from opencda.core.sensing.localization.localization_manager \
     import LocalizationManager
 from opencda.customize.core.sensing.localization.extented_kalman_filter \
     import ExtentedKalmanFilter
+import weakref
 
 
 class CustomizedLocalizationManager(LocalizationManager):

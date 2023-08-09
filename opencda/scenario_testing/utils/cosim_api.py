@@ -54,7 +54,9 @@ class CoScenarioManager(ScenarioManager):
                  xodr_path=None,
                  town=None,
                  cav_world=None,
-                 sumo_file_parent_path=None):
+                 sumo_file_parent_path=None,
+                 clients=2,
+                 client_number=1):
         # carla side initializations(partial init is already done in scenario
         # manager
         super(CoScenarioManager, self).__init__(scenario_params,
@@ -96,13 +98,18 @@ class CoScenarioManager(ScenarioManager):
         sumo_port = scenario_params['sumo']['port']
         sumo_host = scenario_params['sumo']['host']
         sumo_gui = scenario_params['sumo']['gui']
-        sumo_client_order = scenario_params['sumo']['client_order']
+        self.sumo_client_order = client_number
         # tick freq, the same as carla
         sumo_step_length = scenario_params['sumo']['step_length']
 
+        if 'sumo' in scenario_params and 'multiple_clients' in scenario_params['sumo']:
+            self.multiple_clients = scenario_params['sumo']['multiple_clients']
+        else:
+            self.multiple_clients = False
+
         self.sumo = SumoSimulation(sumo_cfg, sumo_step_length,
                                    sumo_host, sumo_port, sumo_gui,
-                                   sumo_client_order)
+                                   self.sumo_client_order, clients)
         # the sumo traffic light should be synchronized with carla
         self.sumo.switch_off_traffic_lights()
 
@@ -115,6 +122,8 @@ class CoScenarioManager(ScenarioManager):
         BridgeHelper.blueprint_library = self.world.get_blueprint_library()
         BridgeHelper.offset = self.sumo.get_net_offset()
 
+        self.CDA_vehicle_id = 0
+
     def tick(self):
         """
         Execute a single step of co-simulation. Logic: sumo will move the
@@ -125,74 +134,88 @@ class CoScenarioManager(ScenarioManager):
         -------
 
         """
+        main_client = False
+        if self.sumo_client_order == 1:
+            main_client = True
         # -----------------
         # sumo-->carla sync
         # -----------------
         self.sumo.tick()
 
-        # Spawning new sumo actors in carla (i.e, not controlled by carla).
-        sumo_spawned_actors = self.sumo.spawned_actors - set(
-            self.carla2sumo_ids.values())
+        if main_client:
+            # Spawning new sumo actors in carla (i.e, not controlled by carla).
+            sumo_spawned_actors = self.sumo.spawned_actors - set(
+                self.carla2sumo_ids.values())
 
-        for sumo_actor_id in sumo_spawned_actors:
-            self.sumo.subscribe(sumo_actor_id)
-            sumo_actor = self.sumo.get_actor(sumo_actor_id)
+            if self.multiple_clients:
+                new_set = {ident for ident in sumo_spawned_actors if not ident.startswith('carla')}
+                sumo_spawned_actors = new_set
 
-            # given the sumo vehicle type, return the corresponding
-            # carla vehicle type. If there is no such correspondence,
-            # carla will choose a random vehicle type.
-            carla_blueprint = \
-                BridgeHelper.get_carla_blueprint(sumo_actor, False)
+            for sumo_actor_id in sumo_spawned_actors:
+                self.sumo.subscribe(sumo_actor_id)
+                sumo_actor = self.sumo.get_actor(sumo_actor_id)
 
-            if carla_blueprint is not None:
-                # return the sumo-controlled vehicle position under
-                # Carla coordinate system. There is a translation between
-                # the two.
+                # given the sumo vehicle type, return the corresponding
+                # carla vehicle type. If there is no such correspondence,
+                # carla will choose a random vehicle type.
+                carla_blueprint = \
+                    BridgeHelper.get_carla_blueprint(sumo_actor, False)
+
+                if carla_blueprint is not None:
+                    # return the sumo-controlled vehicle position under
+                    # Carla coordinate system. There is a translation between
+                    # the two.
+                    carla_transform = \
+                        BridgeHelper.get_carla_transform(sumo_actor.transform,
+                                                         sumo_actor.extent)
+                    carla_actor_id = self.spawn_actor(carla_blueprint,
+                                                      carla_transform)
+                    if carla_actor_id != INVALID_ACTOR_ID:
+                        self.sumo2carla_ids[sumo_actor_id] = carla_actor_id
+
+                else:
+                    self.sumo.unsubscribe(sumo_actor_id)
+
+            # Destroying sumo arrived actors in carla.
+            for sumo_actor_id in self.sumo.destroyed_actors:
+                if sumo_actor_id in self.sumo2carla_ids:
+                    self.destroy_actor(self.sumo2carla_ids.pop(sumo_actor_id))
+
+            # Updating sumo actors in carla.
+            for sumo_actor_id in self.sumo2carla_ids:
+                carla_actor_id = self.sumo2carla_ids[sumo_actor_id]
+
+                sumo_actor = self.sumo.get_actor(sumo_actor_id)
+
                 carla_transform = \
                     BridgeHelper.get_carla_transform(sumo_actor.transform,
                                                      sumo_actor.extent)
-                carla_actor_id = self.spawn_actor(carla_blueprint,
-                                                  carla_transform)
-                if carla_actor_id != INVALID_ACTOR_ID:
-                    self.sumo2carla_ids[sumo_actor_id] = carla_actor_id
-
-            else:
-                self.sumo.unsubscribe(sumo_actor_id)
-
-        # Destroying sumo arrived actors in carla.
-        for sumo_actor_id in self.sumo.destroyed_actors:
-            if sumo_actor_id in self.sumo2carla_ids:
-                self.destroy_actor(self.sumo2carla_ids.pop(sumo_actor_id))
-
-        # Updating sumo actors in carla.
-        for sumo_actor_id in self.sumo2carla_ids:
-            carla_actor_id = self.sumo2carla_ids[sumo_actor_id]
-
-            sumo_actor = self.sumo.get_actor(sumo_actor_id)
-
-            carla_transform = \
-                BridgeHelper.get_carla_transform(sumo_actor.transform,
-                                                 sumo_actor.extent)
-            assert self.synchronize_vehicle(carla_actor_id,
-                                            carla_transform)
+                assert self.synchronize_vehicle(carla_actor_id,
+                                                carla_transform)
 
         # -----------------
         # carla-->sumo sync
         # -----------------
-        self.world.tick()
-
-        # Update data structures for the current frame.
-        current_actors = set(
-            [vehicle.id for vehicle in
-             self.world.get_actors().filter('vehicle.*')])
-        self.spawned_actors = current_actors.difference(self._active_actors)
-        self.destroyed_actors = self._active_actors.difference(current_actors)
-        self._active_actors = current_actors
-
         # Spawning new carla actors (not controlled by sumo). For example,
         # the CAV we created on the carla side.
-        carla_spawned_actors = self.spawned_actors - set(
-            self.sumo2carla_ids.values())
+        carla_spawned_actors = set()
+        if main_client and not self.multiple_clients:
+            # Update data structures for the current frame.
+            current_actors = set(
+                [vehicle.id for vehicle in
+                 self.world.get_actors().filter('vehicle.*')])
+            self.spawned_actors = current_actors.difference(self._active_actors)
+            self.destroyed_actors = self._active_actors.difference(current_actors)
+            self._active_actors = current_actors
+            carla_spawned_actors = self.spawned_actors - set(
+                self.sumo2carla_ids.values())
+        elif not main_client and self.multiple_clients:
+            carla_spawned_actors = {self.CDA_vehicle_id}.difference(self._active_actors)
+            self._active_actors = {self.CDA_vehicle_id}
+
+        if main_client:
+            self.world.tick()
+
         for carla_actor_id in carla_spawned_actors:
             carla_actor = self.world.get_actor(carla_actor_id)
             type_id = BridgeHelper.get_sumo_vtype(carla_actor)
@@ -219,7 +242,7 @@ class CoScenarioManager(ScenarioManager):
             sumo_actor = self.sumo.get_actor(sumo_actor_id)
             sumo_transform = \
                 BridgeHelper.get_sumo_transform(carla_actor.get_transform(),
-                                            carla_actor.bounding_box.extent)
+                                                carla_actor.bounding_box.extent)
             self.sumo.synchronize_vehicle(sumo_actor_id, sumo_transform,
                                           None)
 
@@ -346,3 +369,9 @@ class CoScenarioManager(ScenarioManager):
                 actor.freeze(False)
 
         self.sumo.close()
+        self.sumo.sumo_process.terminate()
+        self.sumo.ms_van3t_process.terminate()
+
+    def setCDAvehicleID(self, cav_list):
+        for cav in cav_list:
+            self.CDA_vehicle_id = cav.vehicle.id

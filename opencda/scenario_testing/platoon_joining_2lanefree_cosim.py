@@ -16,6 +16,7 @@ from opencda.core.common.cav_world import CavWorld
 from opencda.scenario_testing.evaluations.evaluate_manager import \
     EvaluationManager
 from opencda.scenario_testing.utils.yaml_utils import add_current_time
+from opencda.customize.msvan3t.msvan3t_agent import Msvan3tAgent
 
 
 def run_scenario(opt, scenario_params):
@@ -53,6 +54,11 @@ def run_scenario(opt, scenario_params):
                                                     map_helper=map_api.
                                                     spawn_helper_2lanefree)
 
+        msvan3tAgent = Msvan3tAgent(cav_world,
+                                    cav_list=single_cav_list,
+                                    cosim_manager=scenario_manager,
+                                    platoon_list=platoon_list)
+
         # create evaluation manager
         eval_manager = \
             EvaluationManager(scenario_manager.cav_world,
@@ -79,7 +85,7 @@ def run_scenario(opt, scenario_params):
                 if single_cav.v2x_manager.in_platoon():
                     single_cav_list.pop(i)
 
-                single_cav.update_info()
+                single_cav.update_info_LDM()
                 control = single_cav.run_step()
                 single_cav.vehicle.apply_control(control)
 
@@ -92,3 +98,5 @@ def run_scenario(opt, scenario_params):
 
         for v in single_cav_list:
             v.destroy()
+
+        msvan3tAgent.destroy()

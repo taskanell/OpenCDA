@@ -20,8 +20,8 @@ vehicle_base:
 
 # define sumo simulation setting for traffic generation
 sumo:
-  port: ~
-  host: ~
+  port: 8813
+  host: localhost
   gui: true
   client_order: 1
   step_length: ${world.fixed_delta_seconds}

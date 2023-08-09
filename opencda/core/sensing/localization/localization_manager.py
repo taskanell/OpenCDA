@@ -10,7 +10,7 @@ from collections import deque
 
 import carla
 import numpy as np
-
+import math
 from opencda.core.common.misc import get_speed
 from opencda.core.sensing.localization.localization_debug_helper \
     import LocDebugHelper
@@ -105,6 +105,7 @@ class ImuSensor(object):
     """
 
     def __init__(self, vehicle):
+        self.accelerometer = None
         world = vehicle.get_world()
         blueprint = world.get_blueprint_library().find('sensor.other.imu')
         self.sensor = world.spawn_actor(
@@ -177,6 +178,8 @@ class LocalizationManager(object):
         # speed and transform and current timestamp
         self._ego_pos = None
         self._speed = 0
+        self._ego_geoPos = None
+        self._ego_acc = 0
 
         # history track
         self._ego_pos_history = deque(maxlen=100)
@@ -206,6 +209,8 @@ class LocalizationManager(object):
         if not self.activate:
             self._ego_pos = self.vehicle.get_transform()
             self._speed = get_speed(self.vehicle)
+            self._ego_geoPos = self.map.transform_to_geolocation(self._ego_pos.location)
+            # self._ego_acc = math.sqrt(self.imu.accelerometer[0] ** 2 + self.imu.accelerometer[1] ** 2 + self.imu.accelerometer[2] ** 2)
         else:
             speed_true = get_speed(self.vehicle)
             speed_noise = self.add_speed_noise(speed_true)
@@ -237,26 +242,31 @@ class LocalizationManager(object):
                     self.imu.gyroscope[2])
                 self._speed = speed_kf * 3.6
                 heading_angle_kf = np.rad2deg(heading_angle_kf)
+                self._ego_acc = math.sqrt(
+                 self.imu.accelerometer[0] ** 2 + self.imu.accelerometer[1] ** 2 + self.imu.accelerometer[2] ** 2)
 
             # add data to debug helper
-            self.debug_helper.run_step(x,
-                                       y,
-                                       heading_angle,
-                                       speed_noise,
-                                       x_kf,
-                                       y_kf,
-                                       heading_angle_kf,
-                                       self._speed,
-                                       location.x,
-                                       location.y,
-                                       rotation.yaw,
-                                       speed_true)
+            # self.debug_helper.run_step(x,
+            #                            y,
+            #                            heading_angle,
+            #                            speed_noise,
+            #                            x_kf,
+            #                            y_kf,
+            #                            heading_angle_kf,
+            #                            self._speed,
+            #                            location.x,
+            #                            location.y,
+            #                            rotation.yaw,
+            #                            speed_true)
 
             # the final pose of the vehicle
             self._ego_pos = carla.Transform(
                 carla.Location(
                     x=x_kf, y=y_kf, z=z), carla.Rotation(
                     pitch=0, yaw=heading_angle_kf, roll=0))
+
+            self._ego_geoPos = self.map.transform_to_geolocation(self._ego_pos.location)
+
 
             # save the track for future use
             self._ego_pos_history.append(self._ego_pos)
@@ -299,6 +309,18 @@ class LocalizationManager(object):
         Retrieve ego vehicle position
         """
         return self._ego_pos
+
+    def get_ego_geo_pos(self):
+        """
+        Retrieve ego vehicle geographical position position
+        """
+        return self._ego_geoPos
+
+    def get_ego_acc(self):
+        """
+        Retrieve ego vehicle acceleration
+        """
+        return self._ego_acc
 
     def get_ego_spd(self):
         """

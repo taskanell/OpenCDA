@@ -59,7 +59,7 @@ rsu_base:
 vehicle_base:
   sensing: # include perception and localization
     perception:
-      activate: false # when not activated, objects positions will be retrieved from server directly
+      activate: true # when not activated, objects positions will be retrieved from server directly
       camera:
         visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
         num: 1 # how many cameras are mounted on the vehicle.
@@ -112,7 +112,7 @@ vehicle_base:
       light_dist_thresh: 20
 
   behavior:
-    max_speed: 111 # maximum speed, km/h
+    max_speed: 90 # maximum speed, km/h
     tailgate_speed: 121 # when a vehicles needs to be close to another vehicle asap
     speed_lim_dist: 3 # max_speed - speed_lim_dist = target speed
     speed_decrease: 15 # used in car following mode to decrease speed for distance keeping
@@ -177,7 +177,7 @@ platoon_base:
   open_gap: 1.2 # open gap
   warm_up_speed: 55 # required speed before cooperative merging
   change_leader_speed: true # whether to assign leader multiple speed to follow
-  leader_speeds_profile: [ 85, 95 ] # different speed for leader to follow
+  leader_speeds_profile: [ 60, 85, 95 ] # different speed for leader to follow
   stage_duration: 10 # how long should the leader keeps in the current velocity stage
 
 # define tne scenario in each specific scenario

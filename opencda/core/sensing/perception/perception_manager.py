@@ -9,7 +9,7 @@ Perception module base.
 import weakref
 import sys
 import time
-
+import math
 import carla
 import cv2
 import numpy as np
@@ -547,6 +547,23 @@ class PerceptionManager:
                     (str(i), self.id), rgb_image)
             cv2.waitKey(1)
 
+        duplicate_indices = set()
+        # Iterate through the objects to check for duplicates
+        for i in range(len(objects['vehicles'])):
+            for j in range(i + 1, len(objects['vehicles'])):
+                dist = math.sqrt(pow(objects['vehicles'][i].location.x - objects['vehicles'][j].location.x, 2)
+                                 + pow(objects['vehicles'][i].location.y - objects['vehicles'][j].location.y, 2))
+                if dist < 3 or objects['vehicles'][i].carla_id == objects['vehicles'][j].carla_id:
+                    if (objects['vehicles'][i].bounding_box.extent.x*objects['vehicles'][i].bounding_box.extent.y) > \
+                            (objects['vehicles'][j].bounding_box.extent.x * objects['vehicles'][j].bounding_box.extent.y):
+                        duplicate_indices.add(j)
+                    else:
+                        duplicate_indices.add(i)
+
+        # Remove duplicate objects from the list
+        for index in sorted(duplicate_indices, reverse=True):
+            objects['vehicles'].pop(index)
+
         if self.lidar_visualize:
             while self.lidar.data is None:
                 continue
@@ -650,6 +667,52 @@ class PerceptionManager:
         # add traffic light
         objects = self.retrieve_traffic_lights(objects)
         self.objects = objects
+
+        return objects
+
+    def getGTobjects(self):
+        """
+        Object detection using server information directly.
+
+        Returns
+        -------
+         objects: dict
+            Object dictionary.
+        """
+        world = self.carla_world
+
+        vehicle_list = world.get_actors().filter("*vehicle*")
+        # todo: hard coded
+        thresh = 75
+
+        if self.ego_pos:
+            vehicle_list = [v for v in vehicle_list if self.dist(v) < thresh and
+                            v.id != self.id]
+        else:
+            vehicle_list = [v for v in vehicle_list if v.id != self.id]
+
+        # convert carla.Vehicle to opencda.ObstacleVehicle if lidar
+        # visualization is required.
+        if self.lidar:
+            vehicle_list = [
+                ObstacleVehicle(
+                    None,
+                    None,
+                    v,
+                    self.lidar.sensor,
+                    None) for v in vehicle_list]
+        else:
+            vehicle_list = [
+                ObstacleVehicle(
+                    None,
+                    None,
+                    v,
+                    None,
+                    self.cav_world.sumo2carla_ids) for v in vehicle_list]
+
+        objects = {'vehicles': vehicle_list}
+        # add traffic light
+        objects = self.retrieve_traffic_lights(objects)
 
         return objects
 
@@ -790,19 +853,21 @@ class PerceptionManager:
         world = self.carla_world
         tl_list = world.get_actors().filter('traffic.traffic_light*')
 
-        vehicle_location = self.ego_pos.location
-        vehicle_waypoint = self._map.get_waypoint(vehicle_location)
+        if self.ego_pos:
+            vehicle_location = self.ego_pos.location
+            vehicle_waypoint = self._map.get_waypoint(vehicle_location)
 
-        activate_tl, light_trigger_location = \
-            self._get_active_light(tl_list, vehicle_location, vehicle_waypoint)
+            activate_tl, light_trigger_location = \
+                self._get_active_light(tl_list, vehicle_location, vehicle_waypoint)
 
-        objects.update({'traffic_lights': []})
+            objects.update({'traffic_lights': []})
 
-        if activate_tl is not None:
-            traffic_light = TrafficLight(activate_tl,
-                                         light_trigger_location,
-                                         activate_tl.get_state())
-            objects['traffic_lights'].append(traffic_light)
+            if activate_tl is not None:
+                traffic_light = TrafficLight(activate_tl,
+                                             light_trigger_location,
+                                             activate_tl.get_state())
+                objects['traffic_lights'].append(traffic_light)
+
         return objects
 
     def _get_active_light(self, tl_list, vehicle_location, vehicle_waypoint):

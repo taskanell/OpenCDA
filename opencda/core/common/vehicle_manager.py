@@ -4,12 +4,13 @@ Basic class of CAV
 """
 # Author: Runsheng Xu <rxx3386@ucla.edu>
 # License: TDG-Attribution-NonCommercial-NoDistrib
-
+import os, sys
+import importlib
 import uuid
 
 from opencda.core.actuation.control_manager \
     import ControlManager
-from opencda.core.application.platooning.platoon_behavior_agent\
+from opencda.core.application.platooning.platoon_behavior_agent \
     import PlatooningBehaviorAgent
 from opencda.core.common.v2x_manager \
     import V2XManager
@@ -22,6 +23,8 @@ from opencda.core.plan.behavior_agent \
     import BehaviorAgent
 from opencda.core.map.map_manager import MapManager
 from opencda.core.common.data_dumper import DataDumper
+from opencda.customize.platooning.platooning_behavior_agent import PlatooningBehaviorAgentExtended
+from opencda.customize.msvan3t.msvan3t_agent import Msvan3tAgent
 
 
 class VehicleManager(object):
@@ -115,7 +118,7 @@ class VehicleManager(object):
         self.agent = None
         if 'platooning' in application:
             platoon_config = config_yaml['platoon']
-            self.agent = PlatooningBehaviorAgent(
+            self.agent = PlatooningBehaviorAgentExtended(
                 vehicle,
                 self,
                 self.v2x_manager,
@@ -136,6 +139,8 @@ class VehicleManager(object):
             self.data_dumper = None
 
         cav_world.update_vehicle_manager(self)
+
+        # self.msvan3tAgent = Msvan3tAgent(cav_world, self.vid, self.perception_manager, self.localizer, self.carla_map, self.vehicle)
 
     def set_destination(
             self,
@@ -207,6 +212,7 @@ class VehicleManager(object):
         """
         # visualize the bev map if needed
         self.map_manager.run_step()
+
         target_speed, target_pos = self.agent.run_step(target_speed)
         control = self.controller.run_step(target_speed, target_pos)
 

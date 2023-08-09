@@ -42,13 +42,15 @@ class CollisionChecker:
             ego_pos,
             target_vehicle,
             candidate_vehicle,
-            carla_map):
+            carla_map,
+            target_location=None):
         """
         Check whether there is a obstacle vehicle between target_vehicle
         and ego_vehicle during back_joining.
 
         Parameters
         ----------
+        target_location
         carla_map : carla.map
             Carla map  of the current simulation world.
 
@@ -68,7 +70,10 @@ class CollisionChecker:
         Indicator of whether the target vehicle is in range.
         """
         ego_loc = ego_pos.location
-        target_loc = target_vehicle.get_location()
+        if target_location is not None:
+            target_loc = target_location
+        else:
+            target_loc = target_vehicle.get_location()
         candidate_loc = candidate_vehicle.get_location()
 
         # set the checking rectangle

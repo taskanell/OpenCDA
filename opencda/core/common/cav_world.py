@@ -135,7 +135,8 @@ class CavWorld(object):
             x = vm.localizer.get_ego_pos().location.x
             y = vm.localizer.get_ego_pos().location.y
 
-            if loc.x == x and loc.y == y:
+            # if loc.x == x and loc.y == y:
+            if abs(loc.x - x) <= 1 and abs(loc.y - y) <= 1:
                 target_vm = vm
                 break
 

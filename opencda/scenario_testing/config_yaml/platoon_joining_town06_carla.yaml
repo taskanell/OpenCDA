@@ -8,15 +8,21 @@ description: |-
 vehicle_base:
   sensing:
     perception:
+      activate: true # when not activated, objects positions will be retrieved from server directly
       camera:
         visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
-        num: 0 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+        num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
         # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
-        positions: []
+        positions:
+          - [ 2.5, 0, 1.0, 0 ]
+          - [ 0.0, 0.3, 1.8, 100 ]
+          - [ 0.0, -0.3, 1.8, -100 ]
+          - [ -2.0, 0.0, 1.5, 180 ]
       lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-        visualize: false
+        visualize: true
 
     localization: &base_localize
+      activate: true # when not activated, ego position will be retrieved from server directly
       gnss: # gnss sensor configuration
         heading_direction_stddev: 0.1 # degree
         speed_stddev: 0.2
@@ -51,13 +57,33 @@ carla_traffic_manager:
   vehicle_list:
     - spawn_position: [101.7194, 136.51, 0.3, 0, 0, 0]
       vehicle_speed_perc: -200
-    - spawn_position: [57.7194, 143.51, 0.3, 0, 0, 0]
-    - spawn_position: [75.7194, 139.51, 0.3, 0, 0, 0]
-      vehicle_speed_perc: 0
-    - spawn_position: [161.7194, 139.51, 0.3, 0, 0, 0]
+#    - spawn_position: [161.7194, 139.51, 0.3, 0, 0, 0]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 141.7194, 139.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 121.7194, 136.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 111.7194, 146.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 85.7194, 136.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 70.7194, 149.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 115.7194, 143.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 98.7194, 143.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+    - spawn_position: [ 92.7194, 146.51, 0.3, 0, 0, 0 ]
       vehicle_speed_perc: -300
-    - spawn_position: [ 141.7194, 139.51, 0.3, 0, 0, 0 ]
-      vehicle_speed_perc: -300
+#    - spawn_position: [ 128.7194, 143.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 141.7194, 136.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 131.7194, 149.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+#    - spawn_position: [ 105.7194, 149.51, 0.3, 0, 0, 0 ]
+#      vehicle_speed_perc: -300
+
 
 # define scenario. In this scenario, a 4-vehicle platoon already exists.
 scenario:
@@ -70,32 +96,37 @@ scenario:
           sensing:
             perception:
               camera:
-                visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
-                num: 1 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+                visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+                num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
                 # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
                 positions:
-                  - [2.5, 0, 1.0, 0]
+                  - [ 2.5, 0, 1.0, 0 ]
+                  - [ 0.0, 0.3, 1.8, 100 ]
+                  - [ 0.0, -0.3, 1.8, -100 ]
+                  - [ -2.0, 0.0, 1.5, 180 ]
+              lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+                visualize: true
           behavior:
             local_planner:
               debug_trajectory: false
               debug: false
-        - name: cav2
-          spawn_position: [111.7194, 139.51, 0.3, 0, 0, 0]
-        - name: cav3
-          spawn_position: [101.7194, 139.51, 0.3, 0, 0, 0]
-        - name: cav4
-          spawn_position: [91.7194, 139.51, 0.3, 0, 0, 0]
+#        - name: cav2
+#          spawn_position: [111.7194, 139.51, 0.3, 0, 0, 0]
+#        - name: cav3
+#          spawn_position: [101.7194, 139.51, 0.3, 0, 0, 0]
+#        - name: cav4
+#          spawn_position: [91.7194, 139.51, 0.3, 0, 0, 0]
 
 
   single_cav_list: # this is for merging vehicle or single cav without v2x
     - name: cav1
-      spawn_position: [47.7194, 143.51, 0.3, 0, 0, 0]
+      spawn_position: [90.7194, 143.51, 0.3, 0, 0, 0]
       destination: [606.87, 145.39, 0]
       sensing:
         perception:
           activate: true
           camera:
-            visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
+            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
             # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
             positions:
@@ -103,6 +134,8 @@ scenario:
               - [0.0, 0.3, 1.8, 100]
               - [0.0, -0.3, 1.8, -100]
               - [-2.0, 0.0, 1.5, 180]
+          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+            visualize: true
       v2x:
         communication_range: 35
       behavior:
@@ -113,5 +146,24 @@ scenario:
         local_planner:
           debug_trajectory: true
           debug: false
+
+#    - name: cav2
+#      spawn_position: [ 37.7194, 143.51, 0.3, 0, 0, 0 ]
+#      destination: [ 606.87, 145.39, 0 ]
+#      sensing:
+#        perception:
+#          activate: true
+#          camera:
+#            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+#            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+#            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+#            positions:
+#              - [ 2.5, 0, 1.0, 0 ]
+#              - [ 0.0, 0.3, 1.8, 100 ]
+#              - [ 0.0, -0.3, 1.8, -100 ]
+#              - [ -2.0, 0.0, 1.5, 180 ]
+#          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+#            visualize: true
+
 
 

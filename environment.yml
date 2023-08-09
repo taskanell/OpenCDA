@@ -1,4 +1,4 @@
-name: opencda
+name: opencda_2
 channels:
   - defaults
 dependencies:

@@ -39,7 +39,7 @@
 </configuration>
 -->
 <net xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.9" junctionCornerDetail="5" rectangularLaneCut="true" limitTurnSpeed="5.50" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
-  <location netOffset="1204.72,456.54" convBoundary="0.00,0.00,2836.67,453.54" origBoundary="-1204.72,-456.54,1631.95,-3.00" projParameter="!"/>
+  <location netOffset="1204.72,456.54" convBoundary="0.00,0.00,2836.67,453.54" origBoundary="-1204.72,-456.54,1631.95,-3.00" projParameter="+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"/>
   <edge id=":1_0" function="internal">
     <lane id=":1_0_0" index="0" speed="31.31" length="16.98" width="3.66" shape="1188.16,441.22 1191.54,442.45 1195.04,443.46 1199.24,444.14 1204.72,444.39">
       <param key="origId" value="67_-1"/>

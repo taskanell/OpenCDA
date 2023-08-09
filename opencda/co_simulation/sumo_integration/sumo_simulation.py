@@ -24,6 +24,10 @@ from opencda.co_simulation.sumo_integration.constants import INVALID_ACTOR_ID
 
 import lxml.etree as ET  # pylint: disable=import-error
 
+import subprocess
+import multiprocessing
+
+
 # ==================================================================================================
 # -- sumo definitions ------------------------------------------------------------------------------
 # ==================================================================================================
@@ -101,6 +105,7 @@ class SumoActorClass(enum.Enum):
 
 SumoActor = collections.namedtuple('SumoActor', 'type_id vclass transform signals extent color')
 
+
 # ==================================================================================================
 # -- sumo traffic lights ---------------------------------------------------------------------------
 # ==================================================================================================
@@ -110,6 +115,7 @@ class SumoTLLogic(object):
     """
     SumoTLLogic holds the data relative to a traffic light in sumo.
     """
+
     def __init__(self, tlid, states, parameters):
         self.tlid = tlid
         self.states = states
@@ -159,6 +165,7 @@ class SumoTLManager(object):
     SumoTLManager is responsible for the management of the sumo traffic lights (i.e., keeps control
     of the current program, phase, ...)
     """
+
     def __init__(self):
         self._tls = {}  # {tlid: {program_id: SumoTLLogic}
         self._current_program = {}  # {tlid: program_id}
@@ -301,44 +308,58 @@ def _get_sumo_net(cfg_file):
     net_file = os.path.join(os.path.dirname(cfg_file), tag.get('value'))
     logging.debug('Reading net file: %s', net_file)
 
-    sumo_net = traci.sumolib.net.readNet(net_file)
+    sumo_net = sumolib.net.readNet(net_file)
     return sumo_net
+
 
 class SumoSimulation(object):
     """
     SumoSimulation is responsible for the management of the sumo simulation.
     """
-    def __init__(self, cfg_file, step_length, host=None, port=None, sumo_gui=False, client_order=1):
+
+    def __init__(self, cfg_file, step_length, host=None, port=None, sumo_gui=False, client_order=1, num_clients=2):
         if sumo_gui is True:
             sumo_binary = sumolib.checkBinary('sumo-gui')
         else:
             sumo_binary = sumolib.checkBinary('sumo')
 
-        if host is None or port is None:
-            logging.info('Starting new sumo server...')
-            if sumo_gui is True:
-                logging.info('Remember to press the play button to start the simulation')
+        # if host is None or port is None:
+        #     logging.info('Starting new sumo server...')
+        #     if sumo_gui is True:
+        #         logging.info('Remember to press the play button to start the simulation')
+        #     # '--num-clients', str(2),
+        #     traci.start([sumo_binary,
+        #                  '--configuration-file', cfg_file,
+        #                  '--step-length', str(step_length),
+        #                  '--num-clients', str(2),
+        #                  '--collision.check-junctions'
+        #                  ], port=8813)
+        # else:
+        #     logging.info('Connection to sumo server. Host: %s Port: %s', host, port)
+        #     traci.init(host=host, port=port)
+        if client_order == 1:
+            sumo_command = 'sumo-gui --configuration-file ' + cfg_file + ' --step-length ' + str(step_length) + \
+                           ' --num-clients ' + str(num_clients) + ' --collision.check-junctions' + ' --remote-port 8813'
+            self.sumo_process = subprocess.Popen(sumo_command,
+                                                 cwd='/home/carlos', shell=True)
 
-            traci.start([sumo_binary,
-                '--configuration-file', cfg_file,
-                '--step-length', str(step_length),
-                '--collision.check-junctions'
-            ])
+            # ms-van3t integration
+            command = './ns3 run "v2i-areaSpeedAdvisor-80211p"'
+            self.ms_van3t_process = subprocess.Popen(command,
+                                                     cwd='/home/carlos/ms-van3t-CARLA-opt/ns-3-dev', shell=True)
 
-        else:
-            logging.info('Connection to sumo server. Host: %s Port: %s', host, port)
-            traci.init(host=host, port=port)
-
+        traci.init()
         traci.setOrder(client_order)
 
         # Retrieving net from configuration file.
         self.net = _get_sumo_net(cfg_file)
 
-        # Creating a random route to be able to spawn carla actors.
-        traci.route.add("carla_route", [traci.edge.getIDList()[0]])
+        if client_order == 1:
+            # Creating a random route to be able to spawn carla actors.
+            traci.route.add("carla_route", [traci.edge.getIDList()[0]])
 
         # Variable to asign an id to new added actors.
-        self._sequential_id = 0
+        self._sequential_id = client_order
 
         # Structures to keep track of the spawned and destroyed vehicles at each time step.
         self.spawned_actors = set()
@@ -346,6 +367,9 @@ class SumoSimulation(object):
 
         # Traffic light manager.
         self.traffic_light_manager = SumoTLManager()
+
+        # Current time
+        self.time_ms = 0.0
 
     @property
     def traffic_light_ids(self):
@@ -443,6 +467,15 @@ class SumoSimulation(object):
         """
         traci.vehicle.remove(actor_id)
 
+    @staticmethod
+    def getXYfromLonLat(lon, lat):
+        return traci.simulation.convertGeo(lon, lat, True)
+
+    @staticmethod
+    def getLonLatfromXY(X, Y):
+        return traci.simulation.convertGeo(X, Y)
+
+
     def get_traffic_light_state(self, landmark_id):
         """
         Accessor for traffic light state.
@@ -495,9 +528,12 @@ class SumoSimulation(object):
         self.spawned_actors = set(traci.simulation.getDepartedIDList())
         self.destroyed_actors = set(traci.simulation.getArrivedIDList())
 
+        self.time_ms = traci.simulation.getCurrentTime()
+
     @staticmethod
     def close():
         """
         Closes traci client.
         """
         traci.close()
+

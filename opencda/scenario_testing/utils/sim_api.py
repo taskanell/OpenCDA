@@ -19,6 +19,7 @@ import carla
 import numpy as np
 
 from opencda.core.common.vehicle_manager import VehicleManager
+from opencda.customize.core.common.vehicle_manager import ExtendedVehicleManager
 from opencda.core.application.platooning.platooning_manager import \
     PlatooningManager
 from opencda.core.common.rsu_manager import RSUManager
@@ -267,7 +268,9 @@ class ScenarioManager:
 
     def create_vehicle_manager(self, application,
                                map_helper=None,
-                               data_dump=False):
+                               data_dump=False,
+                               pldm=False,
+                               log_dir=None):
         """
         Create a list of single CAVs.
 
@@ -325,11 +328,12 @@ class ScenarioManager:
             vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
 
             # create vehicle manager for each cav
-            vehicle_manager = VehicleManager(
+            vehicle_manager = ExtendedVehicleManager(
                 vehicle, cav_config, application,
                 self.carla_map, self.cav_world,
                 current_time=self.scenario_params['current_time'],
-                data_dumping=data_dump)
+                data_dumping=data_dump,
+                pldm=pldm, log_dir=log_dir)
 
             self.world.tick()
 
@@ -338,7 +342,7 @@ class ScenarioManager:
             destination = carla.Location(x=cav_config['destination'][0],
                                          y=cav_config['destination'][1],
                                          z=cav_config['destination'][2])
-            vehicle_manager.update_info()
+            vehicle_manager.update_info_LDM()
             vehicle_manager.set_destination(
                 vehicle_manager.vehicle.get_location(),
                 destination,
@@ -409,7 +413,7 @@ class ScenarioManager:
                                                  spawn_transform)
 
                 # create vehicle manager for each cav
-                vehicle_manager = VehicleManager(
+                vehicle_manager = ExtendedVehicleManager(
                     vehicle, cav, ['platooning'],
                     self.carla_map, self.cav_world,
                     current_time=self.scenario_params['current_time'],

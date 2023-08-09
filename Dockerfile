@@ -77,7 +77,7 @@
 # -v /tmp/.X11-unix:/tmp/.X11-unix:rw
 # -v $XAUTHORITY:$XAUTHORITY
 
-FROM nvidia/vulkan:1.3-470
+FROM nvidia/cuda:11.6.2-base-ubuntu20.04
 
 # Define build arguments and environment variables.
 
@@ -139,9 +139,9 @@ else echo "SUMO will not be installed." ; fi
 
 RUN if [ ${OPENCDA_FULL_INSTALL} = false ] ; then \
 wget https://raw.githubusercontent.com/ucla-mobility/OpenCDA/main/requirements.txt \
-&& pip install -r requirements.txt && rm requirements.txt ; \
+&& sed -e '/numpy/d' -i requirements.txt && pip install -r requirements.txt && rm requirements.txt ; \
 elif [ ${OPENCDA_FULL_INSTALL} = true ] ; then \
-git clone https://github.com/ucla-mobility/OpenCDA.git && pip install -r OpenCDA/requirements.txt \
+git clone https://github.com/ucla-mobility/OpenCDA.git && sed -e '/numpy/d' -i OpenCDA/requirements.txt && pip install -r OpenCDA/requirements.txt \
 && chmod u+x OpenCDA/setup.sh && sed -i '/conda activate opencda/d' OpenCDA/setup.sh \
 && sed -i 's+${PWD}/+${PWD}/OpenCDA/+g' OpenCDA/setup.sh && ./OpenCDA/setup.sh \
 && chown -R ${USER}:${USER} /home/OpenCDA ; \

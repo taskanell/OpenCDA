@@ -210,7 +210,7 @@ class PlatooningManager(object):
         """
         self.reset_speed()
         for i in range(len(self.vehicle_manager_list)):
-            self.vehicle_manager_list[i].update_info()
+            self.vehicle_manager_list[i].update_info_LDM()
         # update the center location of the platoon
         self.cal_center_loc()
 
@@ -224,10 +224,14 @@ class PlatooningManager(object):
             The control command list for all vehicles.
         """
         control_list = []
+        # print('Platoon status: ')
         for i in range(len(self.vehicle_manager_list)):
             control = self.vehicle_manager_list[i].run_step(
                 self.leader_target_speed)
             control_list.append(control)
+            # print("Vehicle " + str(self.vehicle_manager_list[i].vehicle.id) + ": "
+            #       + str(self.vehicle_manager_list[i].v2xAgent.pcService.status)
+            #       + '(' + str(self.vehicle_manager_list[i].v2x_manager.get_platoon_status()) + ')')
 
         for (i, control) in enumerate(control_list):
             self.vehicle_manager_list[i].vehicle.apply_control(control)

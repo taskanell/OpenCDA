@@ -72,7 +72,7 @@ def run_scenario(opt, scenario_params):
                 if single_cav.v2x_manager.in_platoon():
                     single_cav_list.pop(i)
                 else:
-                    single_cav.update_info()
+                    single_cav.update_info_LDM()
                     control = single_cav.run_step()
                     single_cav.vehicle.apply_control(control)
 

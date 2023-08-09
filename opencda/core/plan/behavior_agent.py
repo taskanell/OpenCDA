@@ -187,7 +187,8 @@ class BehaviorAgent(object):
         """
         Add vehicle manager to white list.
         """
-        self.white_list.append(vm)
+        if vm:
+            self.white_list.append(vm)
 
     def white_list_match(self, obstacles):
         """

@@ -33,6 +33,14 @@ def arg_parse():
     parser.add_argument('-v', "--version", type=str, default='0.9.11',
                         help='Specify the CARLA simulator version, default'
                              'is 0.9.11, 0.9.12 is also supported.')
+    parser.add_argument('-n', '--client_number', type=int, default=1,
+                        help='Specify the SUMO client number. Only to be used when multiple '
+                             'OpenCDA clients are needed.')
+    parser.add_argument('-s', '--sumo_clients', type=int, default=1,
+                        help='Specify the total number of SUMO clients to be launched. Only to be used when multiple '
+                             'SUMO clients are needed.')
+    parser.add_argument('-p', '--pldm', action='store_true',
+                        help='whether to activate the pldm service')
     # parse the arguments and return the result
     opt = parser.parse_args()
     return opt
@@ -57,12 +65,15 @@ def main():
     scene_dict = OmegaConf.merge(default_dict, scene_dict)
 
     # import the testing script
+
     testing_scenario = importlib.import_module(
         "opencda.scenario_testing.%s" % opt.test_scenario)
     # check if the yaml file for the specific testing scenario exists
     if not os.path.isfile(config_yaml):
         sys.exit(
             "opencda/scenario_testing/config_yaml/%s.yaml not found!" % opt.test_cenario)
+
+
 
     # get the function for running the scenario from the testing script
     scenario_runner = getattr(testing_scenario, 'run_scenario')
