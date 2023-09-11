@@ -343,10 +343,10 @@ class SumoSimulation(object):
             self.sumo_process = subprocess.Popen(sumo_command,
                                                  cwd='/home/carlos', shell=True)
 
-            # ms-van3t integration
-            command = './ns3 run "v2i-areaSpeedAdvisor-80211p"'
-            self.ms_van3t_process = subprocess.Popen(command,
-                                                     cwd='/mnt/EVO/ms-van3t-CARLA-opt/ns-3-dev', shell=True)
+            # # ms-van3t integration
+            # command = './ns3 run "v2v-CARLA-cosim"'
+            # self.ms_van3t_process = subprocess.Popen(command,
+            #                                          cwd='/mnt/EVO/ms-van3t/ns-3-dev', shell=True)
 
         traci.init()
         traci.setOrder(client_order)

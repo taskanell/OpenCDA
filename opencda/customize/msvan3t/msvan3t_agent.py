@@ -257,7 +257,6 @@ class Msvan3tAgent(object):
             if not platoon_member:
                 for cav in self.cav_list:
                     if cav.vehicle.id == carla_id:
-                        # object detection
                         #  Send reply back to client
                         if request['status'] == 'request':
                             reply = self.createCPM(cav, request['stationID'])
