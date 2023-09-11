@@ -405,16 +405,13 @@ class PerceptionManager:
         else:
             self.rgb_camera = None
 
-        # we only spawn the LiDAR when perception module is activated or lidar
-        # visualization is needed
-        if self.activate or self.lidar_visualize:
-            self.lidar = LidarSensor(vehicle,
-                                     self.carla_world,
-                                     config_yaml['lidar'],
-                                     self.global_position)
+        self.lidar = LidarSensor(vehicle,
+                                 self.carla_world,
+                                 config_yaml['lidar'],
+                                 self.global_position)
+        if self.lidar_visualize:
             self.o3d_vis = o3d_visualizer_init(self.id)
         else:
-            self.lidar = None
             self.o3d_vis = None
 
         # if data dump is true, semantic lidar is also spawned
@@ -515,11 +512,13 @@ class PerceptionManager:
         # rgb_images for drawing
         rgb_draw_images = []
 
+        data_copy = np.copy(self.lidar.data)
+
         for (i, rgb_camera) in enumerate(self.rgb_camera):
             # lidar projection
             rgb_image, projected_lidar = st.project_lidar_to_camera(
                 self.lidar.sensor,
-                rgb_camera.sensor, self.lidar.data, np.array(
+                rgb_camera.sensor, data_copy, np.array(
                     rgb_camera.image))
             rgb_draw_images.append(rgb_image)
 
@@ -527,7 +526,7 @@ class PerceptionManager:
             objects = o3d_camera_lidar_fusion(
                 objects,
                 yolo_detection.xyxy[i],
-                self.lidar.data,
+                data_copy,
                 projected_lidar,
                 self.lidar.sensor)
 
@@ -547,6 +546,7 @@ class PerceptionManager:
                     (str(i), self.id), rgb_image)
             cv2.waitKey(1)
 
+        objects['vehicles'] = [item for item in objects['vehicles'] if item.confidence >= 0.7]
         duplicate_indices = set()
         # Iterate through the objects to check for duplicates
         for i in range(len(objects['vehicles'])):
@@ -554,8 +554,9 @@ class PerceptionManager:
                 dist = math.sqrt(pow(objects['vehicles'][i].location.x - objects['vehicles'][j].location.x, 2)
                                  + pow(objects['vehicles'][i].location.y - objects['vehicles'][j].location.y, 2))
                 if dist < 3 or objects['vehicles'][i].carla_id == objects['vehicles'][j].carla_id:
-                    if (objects['vehicles'][i].bounding_box.extent.x*objects['vehicles'][i].bounding_box.extent.y) > \
-                            (objects['vehicles'][j].bounding_box.extent.x * objects['vehicles'][j].bounding_box.extent.y):
+                    # if (objects['vehicles'][i].bounding_box.extent.x*objects['vehicles'][i].bounding_box.extent.y) > \
+                    #         (objects['vehicles'][j].bounding_box.extent.x * objects['vehicles'][j].bounding_box.extent.y):
+                    if objects['vehicles'][i].confidence > objects['vehicles'][j].confidence:
                         duplicate_indices.add(j)
                     else:
                         duplicate_indices.add(i)
@@ -567,7 +568,7 @@ class PerceptionManager:
         if self.lidar_visualize:
             while self.lidar.data is None:
                 continue
-            o3d_pointcloud_encode(self.lidar.data, self.lidar.o3d_pointcloud)
+            o3d_pointcloud_encode(data_copy, self.lidar.o3d_pointcloud)
             o3d_visualizer_show(
                 self.o3d_vis,
                 self.count,

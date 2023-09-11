@@ -1,77 +1,7 @@
-carla_traffic_manager:
-  global_distance: 4.0
-  global_speed_perc: -50
-  ignore_lights_percentage: 0
-  vehicle_list:
-  - spawn_position:
-    - 65.7113
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 98.6171
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 69.0538
-    - 149.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 151.7001
-    - 146.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 130.1324
-    - 136.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 76.8512
-    - 136.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 155.7351
-    - 136.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 119.1405
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-
 vehicle_base:
   sensing:
     perception:
-      activate: true # when not activated, objects positions will be retrieved from server directly
+      activate: false # when not activated, objects positions will be retrieved from server directly
       camera:
         visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
         num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -97,15 +27,15 @@ vehicle_base:
     visualize: false
     activate: false
   behavior: &base_behavior
-    max_speed: 70 # maximum speed, km/h
+    max_speed: 80 # maximum speed, km/h
     tailgate_speed: 80 # when a vehicles needs to be close to another vehicle asap
     overtake_allowed: false # whether overtake allowed, typically false for platoon leader
     collision_time_ahead: 1.1 # used for collision checking
 
 platoon_base:
   max_capacity: 10
-  inter_gap: 0.2 # desired time gap
-  open_gap: 1.0 # open gap
+  inter_gap: 0.6 # desired time gap
+  open_gap: 1.2 # open gap
   warm_up_speed: 30 # required speed before cooperative merging
 
 
@@ -116,7 +46,7 @@ scenario:
       destination: [606.87, 145.39, 0]
       sensing:
         perception:
-          activate: true
+          activate: false
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -134,7 +64,7 @@ scenario:
         pldm: true
       behavior:
         <<: *base_behavior
-        max_speed: 70 # maximum speed, km/h
+        max_speed: 80 # maximum speed, km/h
         tailgate_speed: 111
         overtake_allowed: false
         local_planner:
@@ -146,7 +76,7 @@ scenario:
       destination: [606.87, 145.39, 0]
       sensing:
         perception:
-          activate: true
+          activate: false
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -157,7 +87,7 @@ scenario:
               - [0.0, -0.3, 1.8, -100]
               - [-2.0, 0.0, 1.5, 180]
           lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-            visualize: true
+            visualize: false
       v2x:
         communication_range: 35
         platoon_init_pos: 2
@@ -176,7 +106,7 @@ scenario:
       destination: [606.87, 145.39, 0]
       sensing:
         perception:
-          activate: true
+          activate: false
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -187,7 +117,7 @@ scenario:
               - [0.0, -0.3, 1.8, -100]
               - [-2.0, 0.0, 1.5, 180]
           lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-            visualize: true
+            visualize: false
       v2x:
         communication_range: 35
         platoon_init_pos: 3
@@ -202,11 +132,11 @@ scenario:
           debug: false
 
     - name: cav4
-      spawn_position: [91.7194, 139.51, 0.3, 0, 0, 0]
+      spawn_position: [81.7194, 143.0, 0.3, 0, 0, 0]
       destination: [606.87, 145.39, 0]
       sensing:
         perception:
-          activate: true
+          activate: false
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -217,10 +147,10 @@ scenario:
               - [0.0, -0.3, 1.8, -100]
               - [-2.0, 0.0, 1.5, 180]
           lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-            visualize: true
+            visualize: false
       v2x:
         communication_range: 35
-        platoon_init_pos: 4
+        platoon_init_pos: 0
         pldm: true
       behavior:
         <<: *base_behavior

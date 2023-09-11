@@ -11,8 +11,6 @@ from proton.reactor import Container
 from opencda.customize.platooning.states import FSM
 from collections import deque
 
-from opencda.customize.v2x.aux import LDMObject
-
 
 class PCservice(object):
     def __init__(
@@ -23,7 +21,7 @@ class PCservice(object):
         self.V2Xagent = V2Xagent
         self.pcm_sent = 0
         self.last_pcm = 0
-        self.isJoinable = True
+        self.isJoinable = False
         self.joinableList = set()
 
         # whether leader in a platoon
@@ -34,8 +32,7 @@ class PCservice(object):
         self.platoon_position = None
         self.status = FSM.SEARCHING
 
-
-        self.platoon_list = []
+        self.platoon_list = {}
         self.maximum_capacity = 10
 
         self.destination = None
@@ -90,7 +87,7 @@ class PCservice(object):
         """
         # TODO: check which of the vehicles in front is closer
         self.cav.ldm_mutex.acquire()
-        ldm = self.cav.getLDM()
+        ldm = self.cav.get_context()
         self.cav.ldm_mutex.release()
         ego_pos, ego_spd, objects = self.cav.getInfo()
         best_id = None
@@ -137,7 +134,10 @@ class PCservice(object):
             if (self.last_join_resp + 100 <= self.cav.get_time_ms()) and (self.join_resp_counter < 10):
                 self.sendPMM('JOIN_RESP')
             if self.join_resp_counter >= 10:
-                self.status = FSM.LEADING_MODE
+                if self.platoon_position == 1:
+                    self.status = FSM.LEADING_MODE
+                else:
+                    self.status = FSM.MAINTINING
                 self.isJoinable = False
 
         if self.status == FSM.BACK_JOINING or self.status == FSM.JOINING_FINISHED:
@@ -149,6 +149,9 @@ class PCservice(object):
                 self.sendPCM()
             if self.get_lost_rx_pcm():
                 self.status = FSM.LEAVE
+            if self.platoon_list:
+                if self.platoon_position > max(self.platoon_list.keys()) and self.pcm_sent > 5:
+                    self.isJoinable = True
 
         if self.status == FSM.LEAVE_REQUEST:
             if self.last_tx_pcm + 50 <= self.cav.get_time_ms():
@@ -165,7 +168,8 @@ class PCservice(object):
     def get_lost_rx_pcm(self):
         # print(self.PCMap.items())
         for id, pm in self.PCMap.items():
-            if pm[(len(self.PCMap[id])-1)]['timestamp'] <= ((int(self.cav.get_time_ms()) % 65536) - 500):  # if older than 500ms
+            if pm[(len(self.PCMap[id]) - 1)]['timestamp'] <= (
+                    (int(self.cav.get_time_ms()) % 65536) - 500):  # if older than 500ms
                 return False
         return False
 
@@ -218,20 +222,27 @@ class PCservice(object):
             'trajectory': trajectory_array
         }
         self.last_pcm = self.cav.get_time_ms()
-        self.V2Xagent.AMQPhandler.platoonControl_sender(PCM)
+        # self.V2Xagent.AMQPhandler.platoonControl_sender(PCM)
+        self.V2Xagent.send_buffer.append(PCM)
+        self.V2Xagent.send_event.set()
+        self.pcm_sent += 1
 
     def processPCM(self, pcm):
-        if (self.status == FSM.LEADING_MODE)  or (self.status == FSM.MAINTINING) or (self.status == FSM.JOIN_REQUEST) or (self.status == FSM.BACK_JOINING):
+        # if (self.status == FSM.LEADING_MODE) or (self.status == FSM.MAINTINING) or (
+        #         self.status == FSM.JOIN_REQUEST) or (self.status == FSM.BACK_JOINING):
+        if self.status != FSM.SEARCHING:
             if pcm['stationID'] in self.PCMap:
                 self.PCMap[int(pcm['stationID'])].append(pcm)
             else:
                 self.PCMap[int(pcm['stationID'])] = deque([pcm], maxlen=10)
 
-            if pcm['platoonControlContainer']['platoonPosition'] == self.platoon_position-1:
+            self.platoon_list[pcm['platoonControlContainer']['platoonPosition']] = pcm['stationID']
+
+            if pcm['platoonControlContainer']['platoonPosition'] == self.platoon_position - 1:
                 self.front_vehicle = pcm
-            if pcm['platoonControlContainer']['platoonPosition'] == self.platoon_position-2:
+            if pcm['platoonControlContainer']['platoonPosition'] == self.platoon_position - 2:
                 self.front_vehicle = pcm
-            if pcm['platoonControlContainer']['platoonPosition'] == self.platoon_position+1:
+            if pcm['platoonControlContainer']['platoonPosition'] == self.platoon_position + 1:
                 self.rear_vehicle = pcm
         return True
 
@@ -261,7 +272,9 @@ class PCservice(object):
                'messageType': type,
                'message': message
                }
-        self.V2Xagent.AMQPhandler.platoonControl_sender(PMM)
+        # self.V2Xagent.AMQPhandler.platoonControl_sender(PMM)
+        self.V2Xagent.send_buffer.append(PMM)
+        self.V2Xagent.send_event.set()
 
     def sendJOINreq(self):
 
@@ -317,14 +330,19 @@ class PCservice(object):
         if join_req['receiver'] == int(self.cav.vehicle.id):
             if self.status == FSM.SEARCHING or self.status == FSM.LEADING_MODE:
                 self.leader = True
-                self.platoon_list.append(int(self.cav.vehicle.id))
-                self.platoon_list.append(int(pmm['stationID']))
+                self.platoon_list[1] = (int(self.cav.vehicle.id))
+                self.platoon_list[2] = (int(pmm['stationID']))
                 self.platoon_position = 1
                 self.responseTO = pmm['stationID']
                 self.status = FSM.JOIN_RESPONSE
                 self.sendPMM('JOIN_RESP')
             # TODO: consider the case where a JOIN_REQ is received while performing a JOIN
-            # e.g. for the case where 2 vehicles one to join, for now we do first req first served
+            # e.g. for the case where 2 vehicles want to join, for now we do first req first served
+            elif self.status == FSM.MAINTINING:
+                self.platoon_list[self.platoon_position+1] = (int(pmm['stationID']))
+                self.responseTO = pmm['stationID']
+                self.status = FSM.JOIN_RESPONSE
+                self.sendPMM('JOIN_RESP')
         return True
 
     def processJOINresp(self, pmm):
@@ -336,6 +354,7 @@ class PCservice(object):
                 self.platoon_position = status['joiningPosition']
                 if status['joiningPosition'] == 'maxNofVehiclesInPlatoon':
                     self.isJoinable = False
+                self.platoon_list[status['joiningPosition']-1] = (int(pmm['stationID']))
         return True
 
     def processLEAVE(self, pmm):

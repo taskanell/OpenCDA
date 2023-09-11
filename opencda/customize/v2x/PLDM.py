@@ -7,7 +7,6 @@ import numpy as np
 import open3d as o3d
 from opencda.core.sensing.perception.o3d_lidar_libs import \
     o3d_visualizer_init, o3d_pointcloud_encode, o3d_visualizer_show, o3d_visualizer_showLDM
-from opencda.customize.v2x.aux import LDMObject
 from opencda.core.sensing.perception.obstacle_vehicle import \
     ObstacleVehicle
 import opencda.core.sensing.perception.sensor_transformation as st
@@ -60,9 +59,9 @@ class PLDM(object):
                     object_list[j].o3d_bbx = self.cav.LDMobj_to_o3d_bbx(obj)
                     LDMpredX = PLDMobj.perception.xPosition
                     LDMpredY = PLDMobj.perception.yPosition
-                    if self.cav.time > PLDMobj.perception.timestamp:
-                        LDMpredX += (self.cav.time - PLDMobj.perception.timestamp) * PLDMobj.perception.xSpeed
-                        LDMpredY += (self.cav.time - PLDMobj.perception.timestamp) * PLDMobj.perception.ySpeed
+                    # if self.cav.time > PLDMobj.perception.timestamp:
+                    #     LDMpredX += (self.cav.time - PLDMobj.perception.timestamp) * PLDMobj.perception.xSpeed
+                    #     LDMpredY += (self.cav.time - PLDMobj.perception.timestamp) * PLDMobj.perception.ySpeed
                     LDMpredbbx = get_o3d_bbx(self.cav, LDMpredX, LDMpredY, PLDMobj.perception.width,
                                              PLDMobj.perception.length)
 
@@ -72,7 +71,9 @@ class PLDM(object):
                     iou = compute_IoU(LDMpredbbx, object_list[j].o3d_bbx)
                     if iou > 0:
                         IoU_map[i, j] = iou
-                    elif dist > 3:  # if dist < 3 --> IoU_map[i, j] = 0
+                    elif dist < 4:  # if dist < 3 --> IoU_map[i, j] = 0
+                        IoU_map[i, j] = dist - 1000
+                    else:
                         IoU_map[i, j] = -1000
                 i += 1
                 ldm_ids.append(ID)
@@ -80,79 +81,20 @@ class PLDM(object):
             return IoU_map, new, matched, ldm_ids
         return None, None, None, None
 
-    # def updatePLDM(self):
-    #     objects_diff = []
-    #     objects_sync = []
-    #     for ID, LDMObj in self.cav.LDM.items():
-    #         if ID in self.PLDM:
-    #             objects_sync.append(LDMObj)
-    #             if self.PLDM[ID].detected and self.PLDM[ID].assignedPM == self.cav.vehicle.id:
-    #                 self.PLDM[ID].insertPerception(LDMObj.perception)
-    #                 # We only update PLDM for POs that are assigned to this PM
-    #         else:
-    #             objects_diff.append(LDMObj)
-    #
-    #     IoU_map, new, matched, pldm_ids = self.match_PLDM(objects_diff)
-    #     for j in range(len(objects_diff)):
-    #         obj = objects_diff[j]
-    #         if IoU_map is not None:
-    #             matchedObj = matched[np.where(new == j)[0]]
-    #             if IoU_map[matchedObj, j] >= 0:
-    #                 # We are perceiving an object that was perceived by other pm
-    #                 if self.cav.vehicle.id not in self.PLDM[pldm_ids[matchedObj[0]]].perceivedBy:
-    #                     self.PLDM[pldm_ids[matchedObj[0]]].perceivedBy.append(self.cav.vehicle.id)
-    #                 # Sync LDM's ID with PLDM's
-    #                 self.cav.LDM[pldm_ids[matchedObj[0]]] = self.cav.LDM[obj.id]
-    #                 del self.cav.LDM[obj.id]
-    #                 continue
-    #         # we are detecting a new object, check if LDM's id is available for PLDM
-    #         if obj.id in self.PLDM_ids:
-    #             # If available for PLDM, use this ID
-    #             newID = obj.id
-    #             self.PLDM_ids.remove(newID)
-    #         else:
-    #             # If id is already used for other object in PLDM, we need a new one
-    #             # for both PLDM and LDM
-    #             newID = self.PLDM_ids.pop()
-    #             self.cav.LDM[newID] = self.cav.LDM[obj.id]
-    #             del self.cav.LDM[obj.id]
-    #         self.PLDM[newID] = newPLDMentry(obj.perception, newID, detected=True, onSight=True)
-    #         if self.leader:
-    #             self.PLDM[newID].newPO = False
-    #             self.PLDM[newID].assignedPM = self.cav.vehicle.id
-    #         else:
-    #             self.PLDM[newID].newPO = True
-    #         self.PLDM[newID].kalman_filter = PO_kalman_filter()
-    #         self.PLDM[newID].kalman_filter.init_step(obj.perception.xPosition,
-    #                                                  obj.perception.yPosition,
-    #                                                  obj.perception.width,
-    #                                                  obj.perception.length)
-    #
-    #     # Delete old perceptions
-    #     if self.cav.time > 2.0:
-    #         T = self.cav.time - 2.0
-    #         old_ids = [ID for ID, PLDMobj in self.PLDM.items() if PLDMobj.getLatestPoint().timestamp <= T]
-    #         for ID in old_ids:
-    #             del self.PLDM[ID]
-    #
-    #     # Clean possible duplicates
-    #     # self.cleanDuplicates()
-    #
-    #     # LDM visualization in lidar view
-    #     showObjects = LDM_to_lidarObjects(self)
-    #     gt = self.cav.perception_manager.getGTobjects()
-    #     if self.cav.perception_manager.lidar:
-    #         while self.cav.perception_manager.lidar.data is None:
-    #             continue
-    #         o3d_pointcloud_encode(self.cav.perception_manager.lidar.data, self.cav.perception_manager.lidar.o3d_pointcloud)
-    #         o3d_visualizer_showLDM(
-    #             self.o3d_vis,
-    #             self.cav.perception_manager.count,
-    #             self.cav.perception_manager.lidar.o3d_pointcloud,
-    #             showObjects,
-    #             gt)
-
     def updatePLDM(self, object_list):
+        # Predict position of current PLDM tracks before attempting to match
+        for ID, PLDMobj in self.PLDM.items():
+            # diff = self.cav.time - LDMobj.perception.timestamp
+            self.PLDM[ID].onSight = False  # It will go back to True when appending if we match it
+            PLDMobj.perception.xPosition, \
+                PLDMobj.perception.yPosition, \
+                PLDMobj.perception.xSpeed, \
+                PLDMobj.perception.ySpeed, \
+                PLDMobj.perception.xacc, \
+                PLDMobj.perception.yacc = self.PLDM[ID].kalman_filter.predict()
+            PLDMobj.perception.o3d_bbx = self.cav.LDMobj_to_o3d_bbx(PLDMobj.perception)
+            PLDMobj.perception.timestamp = self.cav.time
+
         IoU_map, new, matched, pldm_ids = self.match_PLDM(object_list['vehicles'])
         for j in range(len(object_list['vehicles'])):
             obj = object_list['vehicles'][j]
@@ -160,8 +102,9 @@ class PLDM(object):
                 matchedObj = matched[np.where(new == j)[0]]
                 if IoU_map[matchedObj, j] >= 0:
                     if self.PLDM[pldm_ids[matchedObj[0]]].detected:
-                        # If we match a PO that this PM is assigned with, update PLDM
-                        if self.PLDM[pldm_ids[matchedObj[0]]].assignedPM == self.cav.vehicle.id:
+                        # If we match a PO that this PM is assigned with or is still a newPO, update PLDM
+                        if (self.PLDM[pldm_ids[matchedObj[0]]].assignedPM == self.cav.vehicle.id) or \
+                                self.PLDM[pldm_ids[matchedObj[0]]].newPO:
                             self.appendObject(obj, pldm_ids[matchedObj[0]])
                         else:
                             # If we match a PO that is assigned to other PM, we add perception to CPM buffer
@@ -187,8 +130,10 @@ class PLDM(object):
             self.PLDM[newID].kalman_filter = PO_kalman_filter()
             self.PLDM[newID].kalman_filter.init_step(obj.xPosition,
                                                      obj.yPosition,
-                                                     obj.width,
-                                                     obj.length)
+                                                     vx=self.cav.vehicle.get_velocity().x,
+                                                     vy=self.cav.vehicle.get_velocity().y,
+                                                     ax=self.cav.vehicle.get_acceleration().x,
+                                                     ay=self.cav.vehicle.get_acceleration().y)
 
         # Delete old perceptions
         if self.cav.time > 2.0:
@@ -197,6 +142,13 @@ class PLDM(object):
             for ID in old_ids:
                 del self.PLDM[ID]
                 self.PLDM_ids.add(ID)
+            if self.cav.time > 2.0:
+                T = self.cav.time - 0.5
+                old_ids = [ID for ID, LDMobj in self.PLDM.items() if LDMobj.getLatestPoint().timestamp <= T
+                           and (self.cav.vehicle.id not in LDMobj.perceivedBy or not LDMobj.tracked)]
+                for ID in old_ids:
+                    del self.PLDM[ID]
+                    self.PLDM_ids.add(ID)
             # Also from CPM buffer
             T = self.cav.time - 0.5
             old_ids = [ID for ID, PLDMobj in self.CPM_buffer.items() if PLDMobj.getLatestPoint().timestamp <= T]
@@ -213,12 +165,13 @@ class PLDM(object):
                 continue
             o3d_pointcloud_encode(self.cav.perception_manager.lidar.data,
                                   self.cav.perception_manager.lidar.o3d_pointcloud)
-            o3d_visualizer_showLDM(
-                self.o3d_vis,
-                self.cav.perception_manager.count,
-                self.cav.perception_manager.lidar.o3d_pointcloud,
-                showObjects,
-                gt)
+            if self.cav.lidar_visualize:
+                o3d_visualizer_showLDM(
+                    self.o3d_vis,
+                    self.cav.perception_manager.count,
+                    self.cav.perception_manager.lidar.o3d_pointcloud,
+                    showObjects,
+                    gt)
 
     def clean_duplicates(self):
         objects = [obj.perception for obj in self.PLDM.values()]
@@ -240,6 +193,7 @@ class PLDM(object):
         if obj.timestamp <= self.PLDM[id].getLatestPoint().timestamp:
             return
 
+        self.PLDM[id].onSight = True
         # Compute the estimated heading angle
         heading = math.degrees(math.atan2(obj.ySpeed, obj.xSpeed))
         obj.heading = heading
@@ -261,6 +215,15 @@ class PLDM(object):
             obj.length = length_max
 
         obj.o3d_bbx = LDMobj_to_o3d_bbx(self.cav, obj)
+
+        x, y, vx, vy, ax, ay = self.PLDM[id].kalman_filter.update(obj.xPosition, obj.yPosition)
+        # print('KFupdate: ', "x: ", x, ",y: ", y, ",vx: ", vx, ",vy: ", vy, ",ax: ", ax, ",ay: ", ay)
+        obj.xPosition = x
+        obj.yPosition = y
+        obj.xSpeed = vx
+        obj.ySpeed = vy
+        obj.xacc = ax
+        obj.yacc = ay
 
         # print('[LDM append] '+str(obj.id) + ' speed: ' + str(obj.xSpeed) + ',' + str(obj.ySpeed))
 
@@ -293,3 +256,27 @@ class PLDM(object):
 
     def getCPM(self):
         return self.CPM_buffer
+
+    def getPLDM_perceptions(self):
+        perceptions = {}
+        for ID, LDMobj in self.PLDM.items():
+            perceptions[ID] = LDMobj.perception
+        return perceptions
+
+    def PLDM2OpencdaObj(self, trafficLights):
+        retObjects = []
+        for ID, LDMObject in self.PLDM.items():
+            corner = np.asarray(LDMObject.perception.o3d_bbx.get_box_points())
+            # covert back to unreal coordinate
+            corner[:, :1] = -corner[:, :1]
+            corner = corner.transpose()
+            # extend (3, 8) to (4, 8) for homogenous transformation
+            corner = np.r_[corner, [np.ones(corner.shape[1])]]
+            # project to world reference
+            corner = st.sensor_to_world(corner, self.cav.perception_manager.lidar.sensor.get_transform())
+            corner = corner.transpose()[:, :3]
+            object = ObstacleVehicle(corner, LDMObject.perception.o3d_bbx)
+            object.carla_id = LDMObject.id
+            retObjects.append(object)
+
+        return {'vehicles': retObjects, 'traffic_lights': trafficLights}

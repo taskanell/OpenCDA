@@ -216,10 +216,14 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
             continue
         for object_ in object_list:
             geometry = object_.perception.o3d_bbx
+            if not object_.tracked:
+                continue
             if object_.detected and object_.onSight:
                 geometry.color = (0, 1, 0)
             elif not object_.detected:
                 geometry.color = (1, 0, 1)
+            elif object_.CPM:
+                geometry.color = (1, 0.7, 0)
             else:
                 geometry.color = (1, 0, 0)
             vis.add_geometry(geometry)
@@ -290,6 +294,7 @@ def o3d_camera_lidar_fusion(objects,
         x1, y1, x2, y2 = int(detection[0]), int(detection[1]), \
             int(detection[2]), int(detection[3])
         label = int(detection[5])
+        confidence = float(detection[4])
 
         # choose the lidar points in the 2d yolo bounding box
         points_in_bbx = \
@@ -340,7 +345,7 @@ def o3d_camera_lidar_fusion(objects,
         corner = corner.transpose()[:, :3]
 
         if is_vehicle_cococlass(label):
-            obstacle_vehicle = ObstacleVehicle(corner, aabb)
+            obstacle_vehicle = ObstacleVehicle(corner, aabb, confidence=confidence)
             if 'vehicles' in objects:
                 objects['vehicles'].append(obstacle_vehicle)
             else:

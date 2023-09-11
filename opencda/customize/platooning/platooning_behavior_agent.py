@@ -150,11 +150,11 @@ class PlatooningBehaviorAgentExtended(BehaviorAgent):
             return target_speed, target_waypoint
 
         # case 6: leading vehicle behavior
-        if status == FSM.LEADING_MODE or status == FSM.JOIN_RESPONSE:
+        if status == FSM.LEADING_MODE:
             return super().run_step(target_speed, collision_detector_enabled)
 
         # case7: maintaining status
-        if status == FSM.MAINTINING or status == FSM.LEAVE_REQUEST:
+        if status == FSM.MAINTINING or status == FSM.JOIN_RESPONSE or status == FSM.LEAVE_REQUEST:
             if self.v2xAgent.pcService.front_vehicle:
                 return self.run_step_maintaining()
 
@@ -232,7 +232,7 @@ class PlatooningBehaviorAgentExtended(BehaviorAgent):
 
             platoon_map = self.v2xAgent.pcService.PCMap
             for id, pm in platoon_map.items():
-                pos = pm[(len(platoon_map[id])-1)]['platoonControlContainer']['referencePosition']
+                pos = pm[(len(platoon_map[id]) - 1)]['platoonControlContainer']['referencePosition']
                 loc = carla.Location(pos["carlaX"], pos["carlaY"], 0)
                 vm_x = loc.x
                 vm_y = loc.y
@@ -255,8 +255,6 @@ class PlatooningBehaviorAgentExtended(BehaviorAgent):
     def calculate_gap(self, distance):
         """
         Calculate the current vehicle and frontal vehicle's time/distance gap.
-        Note: please use groundtruth position of the frontal vehicle to
-        calculate the correct distance.
 
         Parameters
         ----------
@@ -293,7 +291,8 @@ class PlatooningBehaviorAgentExtended(BehaviorAgent):
             frontal_trajectory = self.v2xAgent.pcService.front_vehicle['trajectory']
 
             # get front speed
-            frontal_speed = frontal_vehicle['platoonControlContainer']['longitudinalControl']['longitudinalSpeed'] / 100 * 3.6
+            frontal_speed = frontal_vehicle['platoonControlContainer']['longitudinalControl'][
+                                'longitudinalSpeed'] / 100 * 3.6
 
             ego_trajetory = deque(maxlen=30)
             ego_loc_x, ego_loc_y, ego_loc_z = \
@@ -306,6 +305,9 @@ class PlatooningBehaviorAgentExtended(BehaviorAgent):
 
             # compare speed with frontal veh
             frontal_speedd_diff = ego_speed - frontal_speed
+            print('Vehicle: ', self.vehicle.id, 'ego_speed', ego_speed,
+                  '\nfrontal speed: ', frontal_speed,
+                  '\nfrontal speed diff: ', frontal_speedd_diff)
 
             tracked_length = len(frontal_trajectory) - 1 \
                 if not frontal_front_vehicle \
@@ -398,14 +400,14 @@ class PlatooningBehaviorAgentExtended(BehaviorAgent):
 
         # Distance is computed from the center of the two cars,
         # use bounding boxes to calculate the actual distance
-        distance = distance - frontal_vehicle['platoonControlContainer']['vehicleLength']/20 - max(
+        distance = distance - frontal_vehicle['platoonControlContainer']['vehicleLength'] / 20 - max(
             self.vehicle.bounding_box.extent.y,
             self.vehicle.bounding_box.extent.x)
 
         # safe control for car following todo: make the coefficient
         # controllable
         if distance <= self._ego_speed / 3.6 * 0.01:
-            print("emergency stop!")
+            print(self.vehicle.id, ": emergency stop!")
             return 0, None
 
         target_speed, target_waypoint = self.platooning_following_manager(

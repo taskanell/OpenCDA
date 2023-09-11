@@ -4,15 +4,7 @@ carla_traffic_manager:
   ignore_lights_percentage: 0
   vehicle_list:
   - spawn_position:
-    - 137.4628
-    - 149.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 54.0917
+    - 54.4904
     - 146.51
     - 0.3
     - 0
@@ -20,23 +12,7 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 57.2537
-    - 149.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 120.227
-    - 149.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 69.1135
+    - 53.7512
     - 143.51
     - 0.3
     - 0
@@ -44,47 +20,7 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 95.9161
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 157.7396
-    - 149.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 58.1911
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 85.8404
-    - 149.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 108.4562
-    - 149.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 127.3738
+    - 107.3261
     - 146.51
     - 0.3
     - 0
@@ -92,8 +28,80 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 148.5871
+    - 123.4903
     - 143.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 134.4314
+    - 146.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 120.3737
+    - 136.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 154.6325
+    - 136.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 59.0098
+    - 136.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 147.6509
+    - 143.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 143.0881
+    - 149.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 98.2053
+    - 143.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 78.224
+    - 136.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 82.243
+    - 146.51
     - 0.3
     - 0
     - 0

@@ -100,7 +100,7 @@ class ObstacleVehicle(object):
     """
 
     def __init__(self, corners, o3d_bbx,
-                 vehicle=None, lidar=None, sumo2carla_ids=None):
+                 vehicle=None, lidar=None, sumo2carla_ids=None, confidence=0.0):
 
         if not vehicle:
             self.bounding_box = BoundingBox(corners)
@@ -110,10 +110,12 @@ class ObstacleVehicle(object):
             self.o3d_bbx = o3d_bbx
             self.carla_id = -1
             self.velocity = carla.Vector3D(0.0, 0.0, 0.0)
+            self.confidence = confidence
         else:
             if sumo2carla_ids is None:
                 sumo2carla_ids = dict()
             self.set_vehicle(vehicle, lidar, sumo2carla_ids)
+            self.confidence = 100.0  # They are ground truth perceptions
 
     def get_transform(self):
         """

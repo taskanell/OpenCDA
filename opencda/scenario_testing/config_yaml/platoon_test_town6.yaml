@@ -4,7 +4,23 @@ carla_traffic_manager:
   ignore_lights_percentage: 0
   vehicle_list:
   - spawn_position:
-    - 124.8385
+    - 125.0926
+    - 149.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 121.2634
+    - 136.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 80.7365
     - 143.51
     - 0.3
     - 0
@@ -12,7 +28,7 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 50.0855
+    - 158.1972
     - 143.51
     - 0.3
     - 0
@@ -20,7 +36,7 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 146.6172
+    - 100.4697
     - 146.51
     - 0.3
     - 0
@@ -28,7 +44,15 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 53.6745
+    - 68.4432
+    - 143.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 156.0602
     - 136.51
     - 0.3
     - 0
@@ -36,7 +60,15 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 147.711
+    - 88.5994
+    - 146.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 60.8507
     - 149.51
     - 0.3
     - 0
@@ -44,7 +76,7 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 105.4668
+    - 79.2864
     - 149.51
     - 0.3
     - 0
@@ -52,7 +84,7 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 106.2225
+    - 55.8898
     - 143.51
     - 0.3
     - 0
@@ -60,7 +92,7 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 51.4313
+    - 136.2686
     - 149.51
     - 0.3
     - 0
@@ -68,48 +100,8 @@ carla_traffic_manager:
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 143.3724
-    - 136.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 72.3408
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 79.0857
-    - 136.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 148.9956
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 86.8955
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 60.3857
-    - 143.51
+    - 155.4882
+    - 146.51
     - 0.3
     - 0
     - 0
@@ -250,7 +242,7 @@ scenario:
           debug: false
 
     - name: cav4
-      spawn_position: [91.7194, 139.51, 0.3, 0, 0, 0]
+      spawn_position: [91.7194, 143.0, 0.3, 0, 0, 0]
       destination: [606.87, 145.39, 0]
       sensing:
         perception:
@@ -268,7 +260,7 @@ scenario:
             visualize: true
       v2x:
         communication_range: 35
-        platoon_init_pos: 4
+        platoon_init_pos: 0
         pldm: true
       behavior:
         <<: *base_behavior

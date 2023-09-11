@@ -175,6 +175,7 @@ scenario:
           debug: false
 '''
 y_values = [136.51, 143.51, 146.51, 149.51]
+perc_values = [-110, -100, -90, -80, -70, -60, -50]
 
 num_files = 10
 
@@ -185,7 +186,7 @@ for i in range(num_files):
         data["carla_traffic_manager"]["vehicle_list"] = []
 
     # Generate random number of vehicles
-    num_vehicles = random.randint(5, 15)
+    num_vehicles = random.randint(5, 20)
 
     # Generate vehicles
     last_x_positions = {y: [] for y in y_values}
@@ -194,7 +195,7 @@ for i in range(num_files):
         while len(last_x_positions[y_value]) > 6:
             y_value = random.choice(y_values)
         # x_value = max(round(random.uniform(60, 140), 4), last_x_positions[y_value] + 10) # Ensure minimum separation
-        x_value = round(random.uniform(50, 160), 4)
+        x_value = round(random.uniform(40, 200), 4)
         if len(last_x_positions[y_value]) > 0:
             while not all(abs(x_value - previous) >= 10 for previous in last_x_positions[y_value]):
                 x_value = round(random.uniform(50, 160), 4)
@@ -205,7 +206,7 @@ for i in range(num_files):
                 y_value,  # y value
                 0.3, 0, 0, 0
             ],
-            "vehicle_speed_perc": -200
+            "vehicle_speed_perc": random.choice(perc_values)
         }
         data["carla_traffic_manager"]["vehicle_list"].append(vehicle)
         last_x_positions[y_value].append(x_value)

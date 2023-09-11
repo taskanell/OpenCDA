@@ -494,7 +494,9 @@ class BehaviorAgent(object):
             if not vehicle_state:
                 print("left overtake is operated")
                 self.overtake_counter = 100
-                next_wpt_list = left_wpt.next(self._ego_speed / 3.6 * 6)
+                next_wpt_list = []
+                if self._ego_speed >= 0.0:
+                    next_wpt_list = left_wpt.next(self._ego_speed / 3.6 * 6)
                 if len(next_wpt_list) == 0:
                     return True
 
@@ -525,7 +527,9 @@ class BehaviorAgent(object):
             if not vehicle_state:
                 print("right overtake is operated")
                 self.overtake_counter = 100
-                next_wpt_list = right_wpt.next(self._ego_speed / 3.6 * 6)
+                next_wpt_list = []
+                if self._ego_speed != 0.0:
+                    next_wpt_list = right_wpt.next(self._ego_speed / 3.6 * 6)
                 if len(next_wpt_list) == 0:
                     return True
 

@@ -41,6 +41,12 @@ def arg_parse():
                              'SUMO clients are needed.')
     parser.add_argument('-p', '--pldm', action='store_true',
                         help='whether to activate the pldm service')
+    parser.add_argument('-x', '--xPos', type=float, default=0.0,
+                        help='Specify the x position of spawn point for single vehicle')
+    parser.add_argument('-y', '--yPos', type=float, default=0.0,
+                        help='Specify the y position of spawn point for single vehicle')
+    parser.add_argument('-z', '--pmNum', type=int, default=0,
+                        help='Specify the number of the platoon member')
     # parse the arguments and return the result
     opt = parser.parse_args()
     return opt

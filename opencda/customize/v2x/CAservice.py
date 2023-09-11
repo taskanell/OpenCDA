@@ -7,10 +7,9 @@ from threading import Event
 from proton import Message, Url
 from proton.handlers import MessagingHandler
 from proton.reactor import Container
-from opencda.customize.v2x.LDMutils import CAMfusion
 from opencda.core.sensing.localization.coordinate_transform import geo_to_transform
 
-from opencda.customize.v2x.aux import LDMObject
+from opencda.customize.v2x.aux import Perception
 
 
 class CAservice(object):
@@ -29,7 +28,7 @@ class CAservice(object):
         self.lastCamGen = 0
 
     def checkCAMconditions(self):
-        now = self.cav.time * 1000
+        now = self.cav.get_time_ms()
         condition_verified = False
         dyn_cond_verified = False
 
@@ -75,19 +74,22 @@ class CAservice(object):
         extent = carla.Vector3D(float(highFreqContainer['vehicleLength']) / 10.0,
                                 float(highFreqContainer['vehicleWidth']) / 10.0, 0.75)
         carlaTransform = fromTransform
-        newCV = LDMObject(CAM['stationID'],
-                          carlaTransform.location.x,
-                          carlaTransform.location.y,
-                          extent.x,
-                          extent.y,
-                          CAM['timestamp'] / 1000,
-                          100,
-                          float(highFreqContainer['speed']) / 100 * math.cos(math.radians(carlaTransform.rotation.yaw)),
-                          float(highFreqContainer['speed']) / 100 * math.sin(math.radians(carlaTransform.rotation.yaw)),
-                          carlaTransform.rotation.yaw)
+        newCV = Perception(carlaTransform.location.x,
+                           carlaTransform.location.y,
+                           extent.x,
+                           extent.y,
+                           CAM['timestamp'] / 1000,
+                           100,
+                           float(highFreqContainer['speed']) / 100 * math.cos(
+                               math.radians(carlaTransform.rotation.yaw)),
+                           float(highFreqContainer['speed']) / 100 * math.sin(
+                               math.radians(carlaTransform.rotation.yaw)),
+                           carlaTransform.rotation.yaw,
+                           ID=CAM['stationID'])
         # print('Vehicle ' + str(self.cav.vehicle.id) + ' received CAM from vehicle ' + str(CAM['stationID']))
         self.cav.ldm_mutex.acquire()
-        ldm_id = CAMfusion(self.cav, newCV)
+        # ldm_id = CAMfusion(self.cav, newCV)
+        ldm_id = self.cav.LDM.CAMfusion(newCV)
         self.cav.ldm_mutex.release()
         if CAM['isJoinable'] is True:
             self.V2Xagent.pcService.updateJoinableList(ldm_id)
@@ -101,12 +103,12 @@ class CAservice(object):
         }
         highFreqContainer = {
             'heading': int(self.cav.localizer.get_ego_pos().rotation.yaw * 10),
-            'speed': int(self.cav.localizer.get_ego_spd() * 100/3.6),
+            'speed': int(self.cav.localizer.get_ego_spd() * 100 / 3.6),
             'vehicleLength': int(self.cav.vehicle.bounding_box.extent.x * 20),
             'vehicleWidth': int(self.cav.vehicle.bounding_box.extent.y * 20)
         }
         cam = {
-            'ETSItype': 'CAM',
+            'type': 'CAM',
             'stationID': int(self.cav.vehicle.id),
             'timestamp': int((self.cav.time * 1000)) % 65536,
             'referencePosition': referencePosition,
@@ -114,9 +116,9 @@ class CAservice(object):
             # conversion from (lat,lon) to (x,y) still not implemented in carla
             'x': float(self.cav.localizer.get_ego_pos().location.x),  # Auxiliary fields
             'y': float(self.cav.localizer.get_ego_pos().location.y),
-            # platooning
-            'isJoinable': True if self.V2Xagent.pcService.getIsJoinable() else False
         }
+        if self.V2Xagent.pcService is not None:
+            cam['isJoinable'] = True if self.V2Xagent.pcService.getIsJoinable() else False
 
         # print('Vehicle ' + str(self.cav.vehicle.id) + ' sent CAM')
         self.prev_heading = self.cav.localizer.get_ego_pos().rotation.yaw

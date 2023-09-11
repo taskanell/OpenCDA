@@ -526,6 +526,36 @@ class MapManager(object):
         self.dynamic_bev = draw_agent(corner_list, self.dynamic_bev)
         self.vis_bev = draw_agent(corner_list, self.vis_bev)
 
+    def rasterize_dynamic(self):
+        """
+        Rasterize the dynamic agents.
+
+        Returns
+        -------
+        Rasterization image.
+        """
+        self.dynamic_bev = 255 * np.zeros(
+            shape=(self.raster_size[1], self.raster_size[0], 3),
+            dtype=np.uint8)
+        # filter using half a radius from the center
+        raster_radius = \
+            float(np.linalg.norm(self.raster_size *
+                                 np.array([self.meter_per_pixel,
+                                           self.meter_per_pixel]))) / 2
+        # retrieve all agents
+        dynamic_agents = self.load_agents_world()
+        # filter out agents out of range
+        final_agents = self.agents_in_range(raster_radius,
+                                            dynamic_agents)
+
+        corner_list = []
+        for agent_id, agent in final_agents.items():
+            agent_corner = self.generate_agent_area(agent['corners'])
+            corner_list.append(agent_corner)
+
+        self.dynamic_bev = draw_agent(corner_list, self.dynamic_bev)
+        self.vis_bev = draw_agent(corner_list, self.vis_bev)
+
     def rasterize_static(self):
         """
         Generate the static bev map.

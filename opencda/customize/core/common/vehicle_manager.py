@@ -10,7 +10,6 @@ import numpy as np
 import open3d as o3d
 from opencda.core.sensing.perception.o3d_lidar_libs import \
     o3d_visualizer_init, o3d_pointcloud_encode, o3d_visualizer_show, o3d_visualizer_showLDM
-from opencda.customize.v2x.aux import LDMObject
 from opencda.core.sensing.perception.obstacle_vehicle import \
     ObstacleVehicle
 import opencda.core.sensing.perception.sensor_transformation as st
@@ -19,10 +18,10 @@ import weakref
 
 from opencda.customize.v2x.v2x_agent import V2XAgent
 from opencda.customize.v2x.PLDM import PLDM
+from opencda.customize.v2x.LDM import LDM
 from opencda.customize.v2x.aux import LDMentry
 from opencda.customize.v2x.aux import newLDMentry
 from opencda.customize.v2x.aux import Perception
-from opencda.customize.v2x.LDMutils import LDM2OpencdaObj
 from opencda.customize.v2x.LDMutils import compute_IoU
 from opencda.customize.v2x.LDMutils import PO_kalman_filter
 from opencda.customize.v2x.LDMutils import get_o3d_bbx
@@ -89,7 +88,8 @@ class ExtendedVehicleManager(VehicleManager):
             current_time='',
             data_dumping=False,
             pldm=False,
-            log_dir=None):
+            log_dir=None,
+            ms_vanet=None):
 
         super(ExtendedVehicleManager, self).__init__(vehicle,
                                                      config_yaml,
@@ -98,46 +98,62 @@ class ExtendedVehicleManager(VehicleManager):
                                                      cav_world,
                                                      current_time,
                                                      data_dumping)
-        self.LDM = {}
         self.PLDM = None
         self.pldm = pldm
+        self.platooning = False
         self.log_dir = log_dir
+        self.ms_vanet_agent = ms_vanet
         self.LDM_ids = set(range(1, 256))  # ID pool
         self.time = 0.0
-        if self.perception_manager.lidar:
-            self.o3d_vis = o3d_visualizer_init(vehicle.id * 1000)
+        # if self.perception_manager.lidar:
+        # self.o3d_vis = o3d_visualizer_init(vehicle.id * 1000)
+        self.lidar_visualize = config_yaml['sensing']['perception']['lidar']['visualize']
         self.cav_world = cav_world
-        if pldm:
-            self.file = self.log_dir + '/local_t_PLDM' + str(vehicle.id) + '.csv'
+        if log_dir:
+            if pldm:
+                self.file = self.log_dir + '/local_t_PLDM' + str(vehicle.id) + '.csv'
+            else:
+                self.file = self.log_dir + '/local_t_LDM' + str(vehicle.id) + '.csv'
+            with open(self.file, 'w', newline='') as logfile:
+                writer = csv.writer(logfile)
+                writer.writerow(['Timestamp', 'detection', 'localFusion', 'detectedPOs', 'trackedPOs'])
         else:
-            self.file = self.log_dir + '/local_t_LDM' + str(vehicle.id) + '.csv'
-        with open(self.file, 'w', newline='') as logfile:
-            writer = csv.writer(logfile)
-            writer.writerow(['Timestamp', 'detection', 'localFusion', 'detectedPOs', 'trackedPOs'])
+            self.file = None
         # self.LDM_CPM_idMap = {}
         self.ldm_mutex = threading.Lock()
 
         if self.pldm:
             # self.PLDM = PLDM(self, self.v2xAgent, visualize=True, log=False)
             self.pldm_mutex = threading.Lock()
-            self.platooning = False
+            self.platooning = True
 
-        self.v2xAgent = V2XAgent(self,
-                                 ldm_mutex=self.ldm_mutex,
-                                 AMQPbroker="127.0.0.1:5672",
-                                 PLDM=pldm,
-                                 log_dir=self.log_dir)
-        self.agent.v2xAgent = weakref.ref(self.v2xAgent)()
-        if config_yaml['v2x']['platoon_init_pos'] == 1:
-            self.agent.v2xAgent.pcService.status = FSM.LEADING_MODE
-            if pldm:
-                self.agent.v2xAgent.pldmService.setLeader(True)
-        elif config_yaml['v2x']['platoon_init_pos'] > 1:
-            self.agent.v2xAgent.pcService.status = FSM.MAINTINING
-        self.agent.v2xAgent.pcService.platoon_position = config_yaml['v2x']['platoon_init_pos']
+        self.v2xAgent = None
+        if self.ms_vanet_agent is None:
+            self.v2xAgent = V2XAgent(self,
+                                     ldm_mutex=self.ldm_mutex,
+                                     AMQPbroker="127.0.0.1:5672",
+                                     PLDM=pldm,
+                                     log_dir=self.log_dir)
+            self.agent.v2xAgent = weakref.ref(self.v2xAgent)()
+
+        if 'platooning' in application and self.ms_vanet_agent is None:
+            self.platooning = True
+            if config_yaml['v2x']['platoon_init_pos'] == 1:
+                self.agent.v2xAgent.pcService.status = FSM.LEADING_MODE
+                if pldm:
+                    self.agent.v2xAgent.pldmService.setLeader(True)
+            elif config_yaml['v2x']['platoon_init_pos'] > 1:
+                self.agent.v2xAgent.pcService.status = FSM.MAINTINING
+            self.agent.v2xAgent.pcService.platoon_position = config_yaml['v2x']['platoon_init_pos']
+
+        if not self.pldm:
+            self.LDM = LDM(self, self.v2xAgent, visualize=self.lidar_visualize)
 
     def get_time_ms(self):
-        return self.time * 1000
+        return self.map_manager.world.get_snapshot().elapsed_seconds * 1000
+
+    def get_time(self):
+        return self.map_manager.world.get_snapshot().elapsed_seconds
 
     def update_info_LDM(self):
         # localization
@@ -155,23 +171,26 @@ class ExtendedVehicleManager(VehicleManager):
         # ------------------LDM patch------------------------
         self.time = self.map_manager.world.get_snapshot().elapsed_seconds
         if (self.PLDM is not None) and \
-                (self.v2xAgent.pldmService.recv_plu != 0 or self.v2xAgent.pldmService.leader):
+                (self.v2xAgent.pldmService.recv_plu > 1 or self.v2xAgent.pldmService.leader):
+            # if self.PLDM is not None:
             self.pldm_mutex.acquire()
             self.PLDM.updatePLDM(self.translateDetections(objects))
-            objects = LDM2OpencdaObj(self, self.PLDM.PLDM, objects['traffic_lights'])
+            objects = self.PLDM.PLDM2OpencdaObj(objects['traffic_lights'])
             self.pldm_mutex.release()
-        else:
+        elif not self.pldm:
             self.ldm_mutex.acquire()
-            self.update_LDM(self.translateDetections(objects))
-            objects = self.LDM2OpencdaObj(objects['traffic_lights'])
+            self.LDM.updateLDM(self.translateDetections(objects))
+            objects = self.LDM.LDM2OpencdaObj(objects['traffic_lights'])
             self.ldm_mutex.release()
         file_localFusion = ((time.time_ns() / 1000) - file_detection - file_timestamp)
-        with open(self.file, 'a', newline='') as logfile:
-            writer = csv.writer(logfile)
-            if self.pldm and self.PLDM is not None:
-                writer.writerow([file_timestamp, file_detection, file_localFusion, detected_n, len(self.PLDM.PLDM)])
-            else:
-                writer.writerow([file_timestamp, file_detection, file_localFusion, detected_n, len(self.LDM)])
+
+        if self.file:
+            with open(self.file, 'a', newline='') as logfile:
+                writer = csv.writer(logfile)
+                if self.pldm and self.PLDM is not None:
+                    writer.writerow([file_timestamp, file_detection, file_localFusion, detected_n, len(self.PLDM.PLDM)])
+                else:
+                    writer.writerow([file_timestamp, file_detection, file_localFusion, detected_n, self.LDM.get_LDM_size()])
         # ---------------------------------------------------
 
         # update the ego pose for map manager
@@ -189,12 +208,28 @@ class ExtendedVehicleManager(VehicleManager):
         # update ego position and speed to v2x manager,
         # and then v2x manager will search the nearby cavs
         # self.v2x_manager.update_info(ego_pos, ego_spd)
+        if self.v2xAgent is not None:
+            self.v2xAgent.tick()
 
-        self.v2xAgent.tick()
+        if self.platooning:
+            objects = self.clean_platoon_whitelist(objects)
 
         self.agent.update_information(ego_pos, ego_spd, objects)
         # pass position and speed info to controller
         self.controller.update_info(ego_pos, ego_spd)
+
+    def clean_platoon_whitelist(self, objects):
+        ret_objects = {'vehicles': [], 'traffic_lights': []}
+        for obj in objects['vehicles']:
+            if obj.carla_id in self.v2xAgent.pcService.platoon_list.values():
+                continue
+            ret_objects['vehicles'].append(obj)
+        return ret_objects
+    def get_context(self):
+        if self.pldm and self.PLDM is not None:
+            return self.PLDM.getPLDM_perceptions()
+        else:
+            return self.LDM.getLDM_perceptions()
 
     def translateDetections(self, object_list):
         ego_pos, ego_spd, objects = self.getInfo()
@@ -210,35 +245,11 @@ class ExtendedVehicleManager(VehicleManager):
                                 obj.bounding_box.extent.x * 2,
                                 obj.bounding_box.extent.y * 2,
                                 self.time,
-                                (100 - dist) if dist < 100 else 0)
+                                obj.confidence)
             LDMobj.xSpeed = obj.velocity.x
             LDMobj.ySpeed = obj.velocity.y
             returnedObjects.append(LDMobj)
         return {'vehicles': returnedObjects}
-
-    def cleanDuplicates(self):
-        duplicates = []
-        for ID, LDMobj in self.LDM.items():
-            matchedId = self.matchLDMobject(LDMobj.perception)
-            if matchedId != -1 and matchedId != LDMobj.id:
-                if LDMobj.detected is True and self.LDM[matchedId].detected is False:
-                    duplicates.append(matchedId)
-                elif LDMobj.detected is True and LDMobj.perception.timestamp > self.LDM[matchedId].perception.timestamp:
-                    duplicates.append(matchedId)
-                elif LDMobj.detected is True and \
-                        (LDMobj.perception.width + LDMobj.perception.length) > (
-                        self.LDM[matchedId].perception.width + self.LDM[matchedId].perception.length):
-                    duplicates.append(matchedId)
-                elif LDMobj.detected is False:
-                    duplicates.append(matchedId)
-                else:
-                    duplicates.append(ID)
-        deleted = []
-        for ID in duplicates:
-            if ID not in deleted:
-                del self.LDM[ID]
-                deleted.append(ID)  # In case we have duplicates in the 'duplicates' list
-                self.LDM_ids.add(ID)
 
     def getInfo(self):
         """
@@ -259,58 +270,11 @@ class ExtendedVehicleManager(VehicleManager):
 
         return ego_pos, ego_spd, objects
 
-    def LDM2OpencdaObj(self, trafficLights):
-        # LDM = self.getLDM()
-        retObjects = []
-        for ID, LDMObject in self.LDM.items():
-            corner = np.asarray(LDMObject.perception.o3d_bbx.get_box_points())
-            # covert back to unreal coordinate
-            corner[:, :1] = -corner[:, :1]
-            corner = corner.transpose()
-            # extend (3, 8) to (4, 8) for homogenous transformation
-            corner = np.r_[corner, [np.ones(corner.shape[1])]]
-            # project to world reference
-            corner = st.sensor_to_world(corner, self.perception_manager.lidar.sensor.get_transform())
-            corner = corner.transpose()[:, :3]
-            object = ObstacleVehicle(corner, LDMObject.perception.o3d_bbx)
-            object.carla_id = LDMObject.id
-            retObjects.append(object)
-
-        return {'vehicles': retObjects, 'traffic_lights': trafficLights}
-
-    def getLDM(self):
-        retLDM = {}
-        for ID, LDMobj in self.LDM.items():
-            retLDM[ID] = LDMobj[(len(self.LDM[ID]) - 1)]  # return last sample of each object in LDM
-
-        return retLDM
-
-    def getCPM(self):
-        retLDM = {}
-        for ID, LDMobj in self.LDM.items():
-            if len(self.LDM[ID].pathHistory) < 9:
-                continue
-            retLDM[ID] = LDMobj
-
-        return retLDM
-
     def LDM_to_lidarObjects(self):
         lidarObjects = []
         for ID, LDMobj in self.LDM.items():
             lidarObjects.append(LDMobj)  # return last sample of each object in LDM
         return {'vehicles': lidarObjects}
-
-    def CAMfusion(self, CAMobject):
-        newLDMobject = []
-        matched = False
-        CAMobject.connected = True
-        match = self.matchLDMobject(CAMobject)
-        if match != -1:
-            CAMobject.id = match
-        newLDMobject.append(CAMobject)
-        newObjects = {'vehicles': newLDMobject}
-        self.update_LDM(newObjects, True)
-        return CAMobject.id
 
     def matchLDMobject(self, object):
         matched = False
@@ -331,58 +295,6 @@ class ExtendedVehicleManager(VehicleManager):
                 matchedId = ID
                 break
         return matchedId
-
-    def CPMfusion(self, object_List, fromID):
-        # Try to match CPM objects with LDM ones
-        # If we match an object, we perform fusion averaging the bbx
-        # If can't match the object we append it to the LDM as a new object
-        newLDMobjects = []
-        for CPMobj in object_List:
-            CPMobj.detected = False
-            CPMobj.detectedBy = fromID
-            # print('[CPM fusion] '+str(CPMobj.id) + ' speed: ' + str(CPMobj.xSpeed) + ',' + str(CPMobj.ySpeed))
-            if self.time > CPMobj.timestamp:
-                # If it's an old perception, we need to predict its current position
-                CPMobj.xPosition += CPMobj.xSpeed * (self.time - CPMobj.timestamp)
-                CPMobj.yPosition += CPMobj.ySpeed * (self.time - CPMobj.timestamp)
-            matchedID = self.matchLDMobject(CPMobj)
-            if matchedID != -1:
-                LDMobj = self.getLDM()[matchedID]
-                newLDMobj = LDMObject(CPMobj.id,
-                                      CPMobj.xPosition,
-                                      CPMobj.yPosition,
-                                      CPMobj.length,
-                                      CPMobj.width,
-                                      CPMobj.timestamp,
-                                      CPMobj.confidence)
-                newLDMobj.xSpeed = CPMobj.xSpeed
-                newLDMobj.ySpeed = CPMobj.ySpeed
-                newLDMobj.heading = CPMobj.heading
-                newLDMobj.id = matchedID
-                if self.LDM[matchedID][(len(self.LDM[matchedID]) - 1)].detectedBy != fromID:
-                    # Compute weights depending on the timestamps and confidence (~distance from detecting vehicle)
-                    weightLDM = (LDMobj.timestamp / (CPMobj.timestamp + LDMobj.timestamp)) * \
-                                (LDMobj.confidence / (LDMobj.confidence + CPMobj.confidence))
-                    weightCPM = (CPMobj.timestamp / (CPMobj.timestamp + LDMobj.timestamp)) * \
-                                (CPMobj.confidence / (LDMobj.confidence + CPMobj.confidence))
-                    # Wish there was a cleaner way to do this
-                    # newLDMobj.xPosition = (currX * weightCPM + CPMobj.xPosition * weightLDM) / (weightLDM + weightCPM)
-                    # newLDMobj.yPosition = (currY * weightCPM + CPMobj.yPosition * weightLDM) / (weightLDM + weightCPM)
-                    # newLDMobj.xSpeed = (CPMobj.xSpeed * weightCPM + LDMobj.xSpeed * weightLDM) / (weightLDM + weightCPM)
-                    # newLDMobj.ySpeed = (CPMobj.ySpeed * weightCPM + LDMobj.ySpeed * weightLDM) / (weightLDM + weightCPM)
-                    newLDMobj.width = (CPMobj.width * weightCPM + LDMobj.width * weightLDM) / (weightLDM + weightCPM)
-                    newLDMobj.length = (CPMobj.length * weightCPM + LDMobj.length * weightLDM) / (weightLDM + weightCPM)
-                    # newLDMobj.heading = (CPMobj.heading * weightCPM + LDMobj.heading * weightLDM) / (
-                    #         weightLDM + weightCPM)
-                    # newLDMobj.confidence = (CPMobj.confidence + LDMobj.confidence) / 2
-                    # newLDMobj.timestamp = self.time
-                # print('[CPM after fusion] '+str(newLDMobj.id) + ' speed: ' + str(newLDMobj.xSpeed) + ',' + str(newLDMobj.ySpeed))
-                newLDMobjects.append(newLDMobj)
-            else:
-                # We add the CPM object as a new perception
-                newLDMobjects.append(CPMobj)
-        newObjects = {'vehicles': newLDMobjects}
-        self.update_LDM(newObjects, True)
 
     def LDMobj_to_o3d_bbx(self, LDMobj):
         # o3d bbx test
@@ -428,109 +340,6 @@ class ExtendedVehicleManager(VehicleManager):
         min_arr = objRelPos - np.array([LDMobj.width / 2, LDMobj.length / 2, 0.75])
         max_arr = objRelPos + np.array([LDMobj.width / 2, LDMobj.length / 2, 0.75])
         return min_arr, max_arr
-
-    def match_LDM_local(self, object_list):
-        if len(self.LDM) != 0:
-            IoU_map = np.zeros((len(self.LDM), len(object_list)), dtype=np.float32)
-            i = 0
-            ldm_ids = []
-            for ID, LDMobj in self.LDM.items():
-                for j in range(len(object_list)):
-                    obj = object_list[j]
-                    object_list[j].o3d_bbx = self.LDMobj_to_o3d_bbx(obj)
-                    # LDMpredX, LDMpredY, LDMpredXe, LDMpredYe, \
-                    #     LDMpredXspeed, LDMpredYspeed = LDMobj.kalman_filter.predict()
-                    LDMpredX = LDMobj.perception.xPosition
-                    LDMpredY = LDMobj.perception.yPosition
-                    LDMpredbbx = LDMobj.perception.o3d_bbx
-                    if self.time > LDMobj.perception.timestamp:
-                        LDMpredX += (self.time - LDMobj.perception.timestamp) * LDMobj.perception.xSpeed
-                        LDMpredY += (self.time - LDMobj.perception.timestamp) * LDMobj.perception.ySpeed
-                        LDMpredbbx = self.LDMobj_to_o3d_bbx(LDMobj.perception)
-                    LDMpredbbx = get_o3d_bbx(self, LDMpredX, LDMpredY, LDMobj.perception.width,
-                                             LDMobj.perception.length)
-
-                    dist = math.sqrt(
-                        math.pow((obj.xPosition - LDMpredX), 2) + math.pow((obj.yPosition - LDMpredY), 2))
-                    iou = compute_IoU(LDMpredbbx, object_list[j].o3d_bbx)
-                    if iou > 0:
-                        IoU_map[i, j] = iou
-                    elif dist > 3:  # if dist < 3 --> IoU_map[i, j] = 0
-                        IoU_map[i, j] = -1000
-                i += 1
-                ldm_ids.append(ID)
-            matched, new = linear_assignment(-IoU_map)
-            return IoU_map, new, matched, ldm_ids
-        else:
-            return None, None, None, None
-
-    def update_LDM(self, object_list, CPM=False):
-        updated_ids = []
-        IoU_map, new, matched, ldm_ids = self.match_LDM_local(object_list['vehicles'])
-        for j in range(len(object_list['vehicles'])):
-            obj = object_list['vehicles'][j]
-            obj.o3d_bbx = self.LDMobj_to_o3d_bbx(obj)
-            # matchedID = self.matchLDMobject(obj)
-            if IoU_map is not None:
-                matchedObj = matched[np.where(new == j)[0]]
-                if IoU_map[matchedObj, j] >= 0:
-                    updated_ids.append(ldm_ids[matchedObj[0]])
-                    self.appendObject(obj, ldm_ids[matchedObj[0]])
-                    continue
-            newID = self.LDM_ids.pop()
-            self.LDM[newID] = newLDMentry(obj, newID, detected=True, onSight=True)
-            self.LDM[newID].kalman_filter = PO_kalman_filter()
-            self.LDM[newID].kalman_filter.init_step(obj.xPosition, obj.yPosition, obj.width, obj.length)
-
-        # # Update the position of not updated objects
-        for ID, LDMobj in self.LDM.items():
-            if LDMobj.perception.timestamp < self.time:
-                LDMobj.perception.xPosition += \
-                    (self.time - LDMobj.perception.timestamp) * LDMobj.perception.xSpeed
-                LDMobj.perception.yPosition += \
-                    (self.time - LDMobj.perception.timestamp) * LDMobj.perception.ySpeed
-                LDMobj.perception.o3d_bbx = self.LDMobj_to_o3d_bbx(LDMobj.perception)
-                LDMobj.perception.timestamp = self.time
-
-        # Delete old perceptions
-        if self.time > 2.0:
-            T = self.time - 2.0
-            old_ids = [ID for ID, LDMobj in self.LDM.items() if LDMobj.getLatestPoint().timestamp <= T]
-            for ID in old_ids:
-                del self.LDM[ID]
-                self.LDM_ids.add(ID)
-
-        # Clean possible duplicates
-        if len(self.LDM) != 0:
-            self.clean_duplicates()
-
-        # LDM visualization in lidar view
-        showObjects = self.LDM_to_lidarObjects()
-        gt = self.perception_manager.getGTobjects()
-        if self.perception_manager.lidar:
-            while self.perception_manager.lidar.data is None:
-                continue
-            o3d_pointcloud_encode(self.perception_manager.lidar.data, self.perception_manager.lidar.o3d_pointcloud)
-            o3d_visualizer_showLDM(
-                self.o3d_vis,
-                self.perception_manager.count,
-                self.perception_manager.lidar.o3d_pointcloud,
-                showObjects,
-                gt)
-
-    def clean_duplicates(self):
-        objects = [obj.perception for obj in self.LDM.values()]
-        IoU_map, new, matched, ldm_ids = self.match_LDM_local(objects)
-        indices_to_delete = []
-        for i in range(len(objects)):
-            for j in range(i + 1, len(objects)):
-                if IoU_map[i][j] >= 0 and self.LDM[ldm_ids[j]].detected:
-                    indices_to_delete.append(j)
-        indices_to_delete = list(set(indices_to_delete))
-
-        for i in indices_to_delete:
-            del self.LDM[ldm_ids[i]]
-            self.LDM_ids.add(ldm_ids[i])
 
     def appendObject(self, obj, id):
         if self.vehicle.id not in self.LDM[id].perceivedBy:

@@ -7,14 +7,12 @@ import numpy as np
 import open3d as o3d
 from opencda.core.sensing.perception.o3d_lidar_libs import \
     o3d_visualizer_init, o3d_pointcloud_encode, o3d_visualizer_show, o3d_visualizer_showLDM
-from opencda.customize.v2x.aux import LDMObject
 from opencda.core.sensing.perception.obstacle_vehicle import \
     ObstacleVehicle
 import opencda.core.sensing.perception.sensor_transformation as st
 import csv
 from filterpy.kalman import KalmanFilter
 from scipy.optimize import linear_sum_assignment as linear_assignment
-from opencda.customize.v2x.aux import LDMObject
 from opencda.customize.v2x.aux import LDMentry
 from opencda.customize.v2x.aux import newLDMentry
 from opencda.customize.v2x.aux import PLDMentry
@@ -50,58 +48,46 @@ class speed_kalman_filter:
 
 
 class PO_kalman_filter:
-    def __init__(self):
-        self.f1 = KalmanFilter(dim_x=8, dim_z=4)
-        self.dt = 0.05  # time step
-        self.f1.F = np.array([[1, self.dt, 0, 0, 0, 0, 0, 0],
-                              [0, 1, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 1, self.dt, 0, 0, 0, 0],
-                              [0, 0, 0, 1, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 1, self.dt, 0, 0],
-                              [0, 0, 0, 0, 0, 1, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 1, self.dt],
-                              [0, 0, 0, 0, 0, 0, 0, 1]])
+    def __init__(self, dt=0.05):
+        self.kf = KalmanFilter(dim_x=6, dim_z=2)
+        self.dt = dt  # time step
+        self.kf.F = np.array([[1, 0, self.dt, 0, 0.5 * self.dt ** 2, 0],
+                              [0, 1, 0, self.dt, 0, 0.5 * self.dt ** 2],
+                              [0, 0, 1, 0, self.dt, 0],
+                              [0, 0, 0, 1, 0, self.dt],
+                              [0, 0, 0, 0, 1, 0],
+                              [0, 0, 0, 0, 0, 1]])
 
-        self.f1.H = np.array([[1, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 1, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 1, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 1, 0]])
+        self.kf.H = np.array([[1, 0, 0, 0, 0, 0],
+                              [0, 1, 0, 0, 0, 0]])
         # todo: refine this values
-        self.f1.R = np.array([[10, 0, 0, 0],
-                              [0, 10, 0, 0],
-                              [0, 0, 10, 0],
-                              [0, 0, 0, 10]])
-        self.f1.Q = np.eye(8) * 0.2
+        self.kf.R = np.array([[10, 0],
+                              [0, 10]])
+        noise_ax = 1
+        noise_ay = 1
+        self.kf.Q = np.array(
+            [[self.dt ** 4 / 4 * noise_ax, 0, self.dt ** 3 / 2 * noise_ax, 0, self.dt ** 2 * noise_ax, 0],
+             [0, self.dt ** 4 / 4 * noise_ay, 0, self.dt ** 3 / 2 * noise_ay, 0, self.dt ** 2 * noise_ay],
+             [self.dt ** 3 / 2 * noise_ax, 0, self.dt ** 2 * noise_ax, 0, self.dt * noise_ax, 0],
+             [0, self.dt ** 3 / 2 * noise_ay, 0, self.dt ** 2 * noise_ay, 0, self.dt * noise_ay],
+             [self.dt ** 2 * noise_ax, 0, self.dt * noise_ax, 0, 1, 0],
+             [0, self.dt ** 2 * noise_ay, 0, self.dt * noise_ay, 0, 1]])
 
-    def init_step(self, x, y, xe, ye):
-        self.f1.x = np.array([[x, 0, y, 0, xe, 0, ye, 0]]).T
-        self.f1.P = np.array([[1, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 1, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 1, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 1, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 10, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 100, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 10, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 100]])
+    def init_step(self, x, y, vx=0, vy=0, ax=0, ay=0):
+        self.kf.P *= 1e-4
+        # Initial state [x, y, vx, vy, ax, ay]
+        self.kf.x = np.array([[x], [y], [vx], [vy], [ax], [ay]])
 
     def predict(self):
-        self.f1.predict()
-        # x , y, extentX, extentY, xSpeed, ySpeed
-        return self.f1.x[0, 0], self.f1.x[2, 0], self.f1.x[4, 0], self.f1.x[6, 0], self.f1.x[1, 0], self.f1.x[3, 0]
+        self.kf.predict()
+        # [x, y, vx, vy, ax, ay]
+        return self.kf.x[0, 0], self.kf.x[1, 0], self.kf.x[2, 0], self.kf.x[3, 0], self.kf.x[4, 0], self.kf.x[5, 0]
 
-    def update(self, x, y, xe, ye):
-        z = np.array([[x], [y], [xe], [ye]])
-        self.f1.update(z)
+    def update(self, x, y):
+        z = np.array([[x], [y]])
+        self.kf.update(z)
         # x , y, extentX, extentY, xSpeed, ySpeed
-        return self.f1.x[0, 0], self.f1.x[2, 0], self.f1.x[4, 0], self.f1.x[6, 0], self.f1.x[1, 0], self.f1.x[3, 0]
-
-    def step(self, x, y, xe, ye):
-        z = np.array([[x], [y], [xe], [ye]])
-        self.f1.predict()
-        self.f1.update(z)
-
-        # x , y, extentX, extentY, xSpeed, ySpeed
-        return self.f1.x[0, 0], self.f1.x[2, 0], self.f1.x[4, 0], self.f1.x[6, 0], self.f1.x[1, 0], self.f1.x[3, 0]
+        return self.kf.x[0, 0], self.kf.x[1, 0], self.kf.x[2, 0], self.kf.x[3, 0], self.kf.x[4, 0], self.kf.x[5, 0]
 
 
 def compute_IoU(box1, box2):
@@ -121,124 +107,6 @@ def compute_IoU(box1, box2):
         iou = volume_intersection / volume_union
 
     return iou
-
-
-def CAMfusion(cav, CAMobject):
-    CAMobject.connected = True
-    CAMobject.o3d_bbx = get_o3d_bbx(cav,
-                                    CAMobject.xPosition,
-                                    CAMobject.yPosition,
-                                    CAMobject.width,
-                                    CAMobject.length)
-    if CAMobject.id in cav.LDM:
-        # If this is not the first CAM
-        cav.LDM[CAMobject.id].insertPerception(CAMobject)
-    else:
-        # If this is the first CAM, check if we are already perceiving it
-        IoU_map, new, matched, ldm_ids = match_LDM(cav, [CAMobject])
-        if IoU_map is not None:
-            if IoU_map[matched[0], new[0]] >= 0:
-                # If we are perceiving this object, delete the entry as PO
-                del cav.LDM[ldm_ids[matched[0]]]
-                cav.LDM_ids.add(ldm_ids[matched[0]])
-        # Create new entry
-        if CAMobject.id in cav.LDM_ids:
-            cav.LDM_ids.remove(CAMobject.id)
-        cav.LDM[CAMobject.id] = newLDMentry(CAMobject, CAMobject.id, detected=False, onSight=True)
-        cav.LDM[CAMobject.id].kalman_filter = PO_kalman_filter()
-        cav.LDM[CAMobject.id].kalman_filter.init_step(CAMobject.xPosition,
-                                                      CAMobject.yPosition,
-                                                      CAMobject.width,
-                                                      CAMobject.length)
-    return CAMobject.id
-
-
-def CPMfusion(cav, object_list, fromID):
-    # Try to match CPM objects with LDM ones
-    # If we match an object, we perform fusion averaging the bbx
-    # If can't match the object we append it to the LDM as a new object
-
-    for CPMobj in object_list:
-        if cav.time > CPMobj.timestamp:
-            # If it's an old perception, we need to predict its current position
-            CPMobj.xPosition += CPMobj.xSpeed * (cav.time - CPMobj.timestamp)
-            CPMobj.yPosition += CPMobj.ySpeed * (cav.time - CPMobj.timestamp)
-            CPMobj.o3d_bbx = get_o3d_bbx(cav, CPMobj.xPosition,
-                                         CPMobj.yPosition,
-                                         CPMobj.width,
-                                         CPMobj.length)
-
-    IoU_map, new, matched, ldm_ids = match_LDM(cav, object_list)
-
-    for j in range(len(object_list)):
-        CPMobj = object_list[j]
-        # Compute bbx from cav's POV because we already converted values
-        CPMobj.o3d_bbx = get_o3d_bbx(cav, CPMobj.xPosition,
-                                     CPMobj.yPosition,
-                                     CPMobj.width,
-                                     CPMobj.length)
-        if IoU_map is not None:
-            matchedObj = matched[np.where(new == j)[0]]
-            if IoU_map[matchedObj, j] >= 0:
-                append_CPM_object(cav, CPMobj, ldm_ids[matchedObj[0]], fromID)
-                continue
-        newID = cav.LDM_ids.pop()
-        cav.LDM[newID] = newLDMentry(CPMobj, newID, detected=True, onSight=False)
-        cav.LDM[newID].kalman_filter = PO_kalman_filter()
-        cav.LDM[newID].kalman_filter.init_step(CPMobj.xPosition, CPMobj.yPosition, CPMobj.width, CPMobj.length)
-
-
-def append_CPM_object(cav, CPMobj, id, fromID):
-    if fromID not in cav.LDM[id].perceivedBy:
-        cav.LDM[id].perceivedBy.append(fromID)
-    if CPMobj.timestamp < cav.LDM[id].getLatestPoint().timestamp - 100:  # Consider objects up to 100ms old
-        return
-
-    newLDMobj = Perception(CPMobj.xPosition,
-                           CPMobj.yPosition,
-                           CPMobj.width,
-                           CPMobj.length,
-                           CPMobj.timestamp,
-                           CPMobj.confidence)
-    # If the object is also perceived locally
-    if cav.vehicle.id in cav.LDM[id].perceivedBy:
-        # Compute weights depending on the POage and confidence (~distance from detecting vehicle)
-        LDMobj = cav.LDM[id].perception
-        LDMobj_age = LDMobj.timestamp - cav.time
-        CPMobj_age = CPMobj.timestamp - cav.time
-        if (LDMobj.confidence == 0 and CPMobj.confidence == 0) or \
-                (LDMobj_age == 0 and CPMobj_age == 0):
-            weightCPM = 0.5
-            weightLDM = 0.5
-        else:
-            weightLDM = (LDMobj_age / (CPMobj_age + LDMobj_age)) * \
-                        (LDMobj.confidence / (LDMobj.confidence + CPMobj.confidence))
-            weightCPM = (CPMobj_age / (CPMobj_age + LDMobj_age)) * \
-                        (CPMobj.confidence / (LDMobj.confidence + CPMobj.confidence))
-            if (weightLDM + weightCPM) == 0:
-                weightLDM = 0.5
-                weightCPM = 0.5
-
-        newLDMobj.xPosition = (LDMobj.xPosition * weightCPM + CPMobj.xPosition * weightLDM) / (weightLDM + weightCPM)
-        newLDMobj.yPosition = (LDMobj.yPosition * weightCPM + CPMobj.yPosition * weightLDM) / (weightLDM + weightCPM)
-        newLDMobj.xSpeed = (CPMobj.xSpeed * weightCPM + LDMobj.xSpeed * weightLDM) / (weightLDM + weightCPM)
-        newLDMobj.ySpeed = (CPMobj.ySpeed * weightCPM + LDMobj.ySpeed * weightLDM) / (weightLDM + weightCPM)
-        newLDMobj.width = (CPMobj.width * weightCPM + LDMobj.width * weightLDM) / (weightLDM + weightCPM)
-        newLDMobj.length = (CPMobj.length * weightCPM + LDMobj.length * weightLDM) / (weightLDM + weightCPM)
-        newLDMobj.heading = (CPMobj.heading * weightCPM + LDMobj.heading * weightLDM) / (weightLDM + weightCPM)
-        # newLDMobj.confidence = (CPMobj.confidence + LDMobj.confidence) / 2
-        newLDMobj.timestamp = cav.time
-        cav.LDM[id].onSight = True
-    else:
-        cav.LDM[id].onSight = False
-
-    newLDMobj.o3d_bbx = get_o3d_bbx(cav,
-                                    newLDMobj.xPosition,
-                                    newLDMobj.yPosition,
-                                    newLDMobj.width,
-                                    newLDMobj.length)
-    # cav.LDM[id].kalman_filter.update(newLDMobj.xPosition, newLDMobj.yPosition, newLDMobj.width, newLDMobj.length)
-    cav.LDM[id].insertPerception(newLDMobj)
 
 
 def match_LDM(cav, object_list):
@@ -272,25 +140,6 @@ def match_LDM(cav, object_list):
         return IoU_map, new, matched, ldm_ids
     else:
         return None, None, None, None
-
-
-def LDM2OpencdaObj(cav, LDM, trafficLights):
-    retObjects = []
-    for ID, LDMObject in LDM.items():
-        corner = np.asarray(LDMObject.perception.o3d_bbx.get_box_points())
-        # covert back to unreal coordinate
-        corner[:, :1] = -corner[:, :1]
-        corner = corner.transpose()
-        # extend (3, 8) to (4, 8) for homogenous transformation
-        corner = np.r_[corner, [np.ones(corner.shape[1])]]
-        # project to world reference
-        corner = st.sensor_to_world(corner, cav.perception_manager.lidar.sensor.get_transform())
-        corner = corner.transpose()[:, :3]
-        object = ObstacleVehicle(corner, LDMObject.perception.o3d_bbx)
-        object.carla_id = LDMObject.id
-        retObjects.append(object)
-
-    return {'vehicles': retObjects, 'traffic_lights': trafficLights}
 
 
 def LDM_to_lidarObjects(PLDM):

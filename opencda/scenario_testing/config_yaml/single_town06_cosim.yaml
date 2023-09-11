@@ -48,3 +48,12 @@ scenario:
         local_planner:
           debug_trajectory: false
           debug: false
+    - name: cav2
+      spawn_position: [32.7194, 139.51, 0.3, 0, 0, 0]
+      destination: [600, 145.51, 0.3]
+      v2x:
+        communication_range: 45
+      behavior:
+        local_planner:
+          debug_trajectory: false
+          debug: false

@@ -21,6 +21,8 @@ from proton.handlers import MessagingHandler
 from proton.reactor import Container
 # from opencda.customize.core.common.vehicle_manager import LDMObject
 from opencda.co_simulation.sumo_integration.bridge_helper import BridgeHelper
+from opencda.core.sensing.localization.coordinate_transform import geo_to_transform
+from opencda.customize.v2x.aux import Perception
 import traci  # pylint: disable=import-error
 
 
@@ -272,26 +274,56 @@ class Msvan3tAgent(object):
         return reply
 
     def processCAM(self, cav, CAM):
-        carlaTransform = sumoToCarlaTransform(CAM['fromX'], CAM['fromY'], CAM['fromHeading'], CAM['fromLength'],
-                                              CAM['fromWidth'])
-        newCV = LDMObject(CAM['from'],
-                          carlaTransform.location.x,
-                          carlaTransform.location.y,
-                          CAM['fromLength'],
-                          CAM['fromWidth'],
-                          CAM['timestamp'] / 1000,
-                          100,
-                          CAM['fromSpeed'] * math.cos(math.radians(carlaTransform.rotation.yaw)),
-                          CAM['fromSpeed'] * math.sin(math.radians(carlaTransform.rotation.yaw)),
-                          carlaTransform.rotation.yaw)
-        cav.CAMfusion(newCV)
+        # carlaTransform = sumoToCarlaTransform(CAM['fromX'], CAM['fromY'], CAM['fromHeading'], CAM['fromLength'],
+        #                                       CAM['fromWidth'])
+
+        # Compute the CARLA transform with the longitude and latitude values
+        carlaX, carlaY, carlaZ = geo_to_transform(float(CAM['fromLatitude']),
+                                                  float(CAM['fromLongitude']),
+                                                  float(CAM['fromAltitude']),
+                                                  cav.localizer.geo_ref.latitude,
+                                                  cav.localizer.geo_ref.longitude, 0.0)
+
+        fromTransform = carla.Transform(
+            carla.Location(
+                x=carlaX, y=carlaY, z=carlaZ), carla.Rotation(
+                pitch=0, yaw=float(CAM['fromHeading']), roll=0))
+        extent = carla.Vector3D(float(CAM['fromLength']),
+                                float(CAM['fromWidth']), 0.75)
+
+        newCV = Perception(fromTransform.location.x,
+                           fromTransform.location.y,
+                           extent.x,
+                           extent.y,
+                           CAM['timestamp'],
+                           100, # confidence
+                           float(CAM['fromSpeed']) / 100 * math.cos(
+                               math.radians(fromTransform.rotation.yaw)),
+                           float(CAM['fromSpeed']) / 100 * math.sin(
+                               math.radians(fromTransform.rotation.yaw)),
+                           fromTransform.rotation.yaw,
+                           ID=CAM['stationID'])
+
+        cav.ldm_mutex.acquire()
+        ldm_id = cav.LDM.CAMfusion(newCV)
+        cav.ldm_mutex.release()
         return {'status': 'OK',
                 'stationID': CAM['stationID']}
 
     def processCPM(self, cav, CPM):
         newPOs = []
-        carlaTransform = sumoToCarlaTransform(CPM['fromX'], CPM['fromY'], CPM['fromHeading'], CPM['fromLength'],
-                                              CPM['fromWidth'])
+        # Compute the CARLA transform with the longitude and latitude values
+        carlaX, carlaY, carlaZ = geo_to_transform(float(CPM['fromLatitude']),
+                                                  float(CPM['fromLongitude']),
+                                                  float(CPM['fromAltitude']),
+                                                  cav.localizer.geo_ref.latitude,
+                                                  cav.localizer.geo_ref.longitude, 0.0)
+
+        carlaTransform = carla.Transform(
+            carla.Location(
+                x=carlaX, y=carlaY, z=carlaZ), carla.Rotation(
+                pitch=0, yaw=float(CPM['fromHeading']), roll=0))
+
         if 'POs' in CPM:
             for CPMobj in CPM['POs']:
                 if CPMobj['ObjectID'] == cav.vehicle.id:
@@ -312,26 +344,36 @@ class Msvan3tAgent(object):
                 ySpeed = dSpeed * math.sin(absAngle) + CPM['fromSpeed'] * math.sin(
                     math.radians(carlaTransform.rotation.yaw))
 
+
                 # CPM object converted to LDM format
-                newPO = LDMObject(CPMobj['ObjectID'],
-                                  xPos,
-                                  yPos,
-                                  CPMobj['vehicleLength'] / 10,
-                                  CPMobj['vehicleWidth'] / 10,
-                                  CPMobj['timestamp'] / 1000,
-                                  CPMobj['confidence'])
+                newPO = Perception(xPos,
+                                   yPos,
+                                   float(CPMobj['vehicleWidth']) / 10,
+                                   float(CPMobj['vehicleLength']) / 10,
+                                   float(CPMobj['timestamp']) / 1000,
+                                   float(CPMobj['confidence']),
+                                   ID=CPMobj['ObjectID'])
+
                 newPO.xSpeed = xSpeed
                 newPO.ySpeed = ySpeed
-                # print('[CPM] ' + str(newPO.id) + ' speed: ' + str(newPO.xSpeed) + ',' + str(newPO.ySpeed))
+                newPO.xacc = 0
+                newPO.yacc = 0
                 newPO.heading = math.degrees(absAngle)
                 newPOs.append(newPO)
-            cav.CPMfusion(newPOs, CPM['from'])
+
+            cav.ldm_mutex.acquire()
+            cav.LDM.CPMfusion(newPOs, CPM['from'])
+            cav.ldm_mutex.release()
         return {'status': 'OK',
                 'stationID': CPM['stationID']}
 
     def createCPM(self, cav, sumo_id):
         ego_pos, ego_spd, objects = cav.getInfo()
-        LDM = cav.getCPM()
+
+        if cav.pldm and cav.PLDM is not None:
+            LDM = cav.PLDM.getCPM()
+        else:
+            LDM = cav.LDM.getCPM()
 
         # For debugging
         # print('Ego position: ' + str(ego_pos.location.x) + ', ' + str(ego_pos.location.y))
@@ -345,9 +387,11 @@ class Msvan3tAgent(object):
         nPOs = 0
 
         for carlaID, LDMobj in LDM.items():
-            if LDMobj.detected is False or LDMobj.connected is True:
+            if not LDMobj.detected:
                 continue
-            if LDMobj.timestamp < cav.time - 1.0:
+            if not all([LDMobj.onSight, LDMobj.tracked]):
+                continue
+            if LDMobj.getLatestPoint().timestamp < cav.time - 1.0:
                 continue
             sumo_POid = ""
             # Get SUMO ID of the CARLA detected objectw
@@ -360,16 +404,16 @@ class Msvan3tAgent(object):
             #     else:
             #         continue
 
-            dx = (LDMobj.xPosition - ego_pos.location.x)
-            dy = (LDMobj.yPosition - ego_pos.location.y)
+            dx = (LDMobj.perception.xPosition - ego_pos.location.x)
+            dy = (LDMobj.perception.yPosition - ego_pos.location.y)
             dist = math.sqrt(math.pow(dx, 2) + math.pow(dy, 2))
 
             relAngle = math.atan2(dy, dx) - math.radians(ego_pos.rotation.yaw)
             xDist = dist * math.cos(relAngle)
             yDist = dist * math.sin(relAngle)
 
-            dxSpeed = (LDMobj.xSpeed - ego_spd / 3.6 * math.cos(math.radians(ego_pos.rotation.yaw)))
-            dySpeed = (LDMobj.ySpeed - ego_spd / 3.6 * math.sin(math.radians(ego_pos.rotation.yaw)))
+            dxSpeed = (LDMobj.perception.xSpeed - ego_spd / 3.6 * math.cos(math.radians(ego_pos.rotation.yaw)))
+            dySpeed = (LDMobj.perception.ySpeed - ego_spd / 3.6 * math.sin(math.radians(ego_pos.rotation.yaw)))
             dSpeed = math.sqrt(math.pow(dxSpeed, 2) + math.pow(dySpeed, 2))
             relAngle = math.atan2(dySpeed, dxSpeed) - math.radians(ego_pos.rotation.yaw)
             xSpeed = dSpeed * math.cos(relAngle)
@@ -377,15 +421,17 @@ class Msvan3tAgent(object):
 
             # For debugging
             POs.append({'ObjectID': str(LDMobj.id),
-                        'Heading': LDMobj.heading * 10,  # In degrees/10
+                        'Heading': LDMobj.perception.heading * 10,  # In degrees/10
                         'xSpeed': xSpeed * 100,  # Centimeters per second
                         'ySpeed': ySpeed * 100,  # Centimeters per second
-                        'vehicleWidth': LDMobj.width * 10,  # In meters/10
-                        'vehicleLength': LDMobj.length * 10,  # In meters/10
+                        'xAcceleration': int(LDMobj.perception.xacc * 100),
+                        'yAcceleration': int(LDMobj.perception.yacc * 100),
+                        'vehicleWidth': LDMobj.perception.width * 10,  # In meters/10
+                        'vehicleLength': LDMobj.perception.length * 10,  # In meters/10
                         'xDistance': xDist * 100,  # Centimeters
                         'yDistance': yDist * 100,  # Centimeters
                         'confidence': (100 - dist) if dist < 100 else 0,
-                        'timestamp': LDMobj.timestamp * 1000000})
+                        'timestamp': int(LDMobj.getLatestPoint().timestamp * 1000)})
             nPOs = nPOs + 1
             if nPOs == 10:
                 break
