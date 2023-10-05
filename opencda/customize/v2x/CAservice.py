@@ -26,6 +26,7 @@ class CAservice(object):
         self.cam_sent = 0
         self.next_cam = 0
         self.lastCamGen = 0
+        self.max_CAM_T = 100
 
     def checkCAMconditions(self):
         now = self.cav.get_time_ms()
@@ -51,7 +52,7 @@ class CAservice(object):
         if speed_diff > 0.5 or speed_diff < -0.5:
             return True
 
-        if not condition_verified and (now - self.lastCamGen >= 1000):
+        if not condition_verified and (now - self.lastCamGen >= self.max_CAM_T):
             return True
 
         return False

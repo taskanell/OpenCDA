@@ -126,6 +126,8 @@ class ExtendedVehicleManager(VehicleManager):
             # self.PLDM = PLDM(self, self.v2xAgent, visualize=True, log=False)
             self.pldm_mutex = threading.Lock()
             self.platooning = True
+        elif 'platooning' in application:
+            self.platooning = True
 
         self.v2xAgent = None
         if self.ms_vanet_agent is None:

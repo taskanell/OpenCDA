@@ -285,7 +285,11 @@ class V2XAgent(object):
             # self.AMQPhandler.cam_sender(self.caService.generateCAM())
             self.send_buffer.append(self.caService.generateCAM())
             self.send_event.set()
-        CPM = self.cpService.checkCPMconditions()
+        CPM = False
+        if not self.PLDM:
+            CPM = self.cpService.checkCPMconditions()
+        elif (self.cav.time * 1000) - self.cpService.last_cpm > 100:
+            CPM = self.pldmService.pldm.getCPM()
         if CPM is not False:
             # self.AMQPhandler.cpm_sender(self.cpService.generateCPM())
             self.send_buffer.append(self.cpService.generateCPM(CPM))

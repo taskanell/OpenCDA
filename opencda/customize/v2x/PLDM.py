@@ -255,7 +255,17 @@ class PLDM(object):
                 deleted.append(ID)  # In case we have duplicates in the 'duplicates' list
 
     def getCPM(self):
-        return self.CPM_buffer
+        # return self.CPM_buffer # TODO see why CPM buffer is empty
+        t_map = []
+        cpm = {}
+        for ID, entry in self.PLDM.items():
+            if entry.detected and entry.onSight:
+                t_map.append((entry.getLatestPoint().timestamp, ID))
+        sorted_list = sorted(t_map, key=lambda x: x[0], reverse=True)
+
+        for obj in sorted_list[:10]:
+            cpm[obj[1]] = self.PLDM[obj[1]]
+        return cpm
 
     def getPLDM_perceptions(self):
         perceptions = {}

@@ -12,6 +12,40 @@ from opencda.customize.v2x.LDMutils import get_o3d_bbx
 from scipy.optimize import linear_sum_assignment as linear_assignment
 from opencda.customize.v2x.aux import newPLDMentry
 import time
+import numpy as np
+import random
+
+
+def cpu_cost_single(P, alpha, gamma, n, m):
+    return (alpha[n] + gamma[n] * np.sum(P, axis=0)[m]) / 100
+
+
+def distance_cost_single(D, i, j):
+    Dt = 0
+    while Dt < 1:
+        Dt = D[i, j] + random.randint(-10, 10)
+    if Dt > 100:
+        Dt = 100
+    return Dt / 100
+
+
+def cost_single(P, D, alpha, gamma, i, j, weights):
+    return weights[0] * cpu_cost_single(P, alpha, gamma, i, j) + \
+        weights[1] * distance_cost_single(D, i, j)
+
+
+def get_value_by_index(A, target_index):
+    for item in A:
+        if item[0] == target_index:
+            return item[1]
+    return None  # Return None if the index is not found
+
+
+def get_cpu_by_index(A, target_index):
+    for item in A:
+        if item[0] == target_index:
+            return item[2]
+    return None  # Return None if the index is not found
 
 
 class PLDMservice(object):
@@ -28,9 +62,11 @@ class PLDMservice(object):
         self.recv_pmu = {}
         self.last_plu = 0
         self.last_pmu = 0
+        self.last_assigment = 0
         self.PMs = []
         self.pldm = PLDM(self.cav, self.V2Xagent, visualize=self.cav.lidar_visualize)
         self.cav.PLDM = self.pldm
+        self.assignment_weights = [0.5, 0.5]
 
     def setLeader(self, leader):
         self.leader = leader
@@ -40,19 +76,120 @@ class PLDMservice(object):
         if self.leader and (self.cav.time * 1000) - self.last_plu > 100:
             # if len(set(self.recv_pmu.values())) <= 1:
             # Only send PLU if we have received a PMU from all PMs
-            self.assignPOs()
             self.generatePLU()
             self.leaderSeqNum += 1
+        if self.leader and self.cav.get_time_ms() - self.last_assigment > 1000:
+            self.assignPOs()
+            self.last_assigment = self.cav.get_time_ms()
 
     def assignPOs(self):
         self.optDwell()
         self.balance_resp_pos()
+
+        # self.opt_assginment()
 
         # For debugging
         resp = self.get_all_PM_resp_state()
         print('PM resp: ')
         for PM, POs in resp:
             print('PM ', PM, ' POs ', [PO.id for PO in POs if PO.tracked])
+
+    def get_perception_matrix(self, allPOs):
+        P = np.zeros((len(self.PMs), len(allPOs)), dtype=int)
+        for PO in allPOs:
+            for PM in PO.perceivedBy:
+                if PM in self.PMs:
+                    P[self.PMs.index(PM), allPOs.index(PO)] = 1
+        return P
+
+    def get_distance_matrix(self, allPOs):
+        D = np.zeros((len(self.PMs), len(allPOs)), dtype=float)
+        for PO in allPOs:
+            POpredX = PO.perception.xPosition + PO.perception.xSpeed  # Predicted position in 1 second
+            POpredY = PO.perception.yPosition + PO.perception.ySpeed
+            # POpredbbx = self.cav.LDMobj_to_o3d_bbx(PO.perception)
+            assocPMs = PO.perceivedBy
+            for assocPM in assocPMs:
+                if assocPM in self.pldm.PLDM:
+                    PMpredX = self.pldm.PLDM[assocPM].perception.xPosition + self.pldm.PLDM[
+                        assocPM].perception.xSpeed  # Predicted position in 1 second
+                    PMpredY = self.pldm.PLDM[assocPM].perception.yPosition + self.pldm.PLDM[assocPM].perception.ySpeed
+                    # PMpredbbx = self.cav.LDMobj_to_o3d_bbx(self.pldm.PLDM[assocPM].perception)
+                    D[self.PMs.index(assocPM), allPOs.index(PO)] = math.sqrt(
+                        math.pow((POpredX - PMpredX), 2) + math.pow((POpredY - PMpredY), 2))
+        return D
+
+    def cpu_cost_all(self, P, alpha, gamma):
+        N, M = P.shape
+        C = np.zeros((N, M))
+        for n in range(N):
+            for m in range(M):
+                C[n][m] = (alpha[n] + gamma[n] * np.sum(P, axis=0)[m]) * P[n, m]
+        return C
+
+    def assignX(self, X, allPOs):
+        for i in range(len(X)):
+            for j in range(len(X[i])):
+                if X[i][j] == 1:
+                    self.pldm.PLDM[allPOs[j].ID].assignedPM = self.PMs[i]
+
+    def opt_assginment(self):
+        allPOs = self.getAllPOs()
+        P = self.get_perception_matrix(allPOs)
+        D = self.get_distance_matrix(allPOs)
+        alpha = np.ones(len(self.PMs))
+        gamma = np.ones(len(self.PMs))
+        N, M = P.shape
+        card = (np.sum(P, axis=0))
+        R = []
+        i = 0
+        for r in card:
+            R.append([i, r])
+            i += 1
+        R = sorted(R, key=lambda x: x[1])  # Sorted objects by number of candidates (by Redundancy)
+        C = self.cpu_cost_all(P, alpha, gamma)  # CPU cost matrix
+        CNs = np.zeros(N)  # Current cpu cost of each node
+        X = np.zeros((N, M), dtype=int)  # Empty assignment matrix
+        # For each obj in order of fewer candidates to more candidates
+        for obj in R:
+            m = obj[0]  # Index of the object
+            assignable = [n for n in range(N) if P[n, m] == 1]  # List of assignable nodes
+            single_costs = []
+            for n in assignable:
+                if CNs[n] + C[n][m] <= 200:  # Max cpu cost available constraint
+                    single_costs.append([n, cost_single(P, D, alpha, gamma, n, m, self.assignment_weights),
+                                         C[n][m]])
+            # Sort the nodes
+            single_costs = sorted(single_costs, key=lambda x: x[1])
+            if len(single_costs) == 0:
+                return None, C
+            # If there's no other object assigned to the node, assign it
+            if np.sum(X, axis=1)[single_costs[0][0]] == 0:
+                X[single_costs[0][0], m] = 1
+                CNs[single_costs[0][0]] += single_costs[0][2]
+            else:
+                # Else check fairness cost
+                fairness_costs = []
+                for n in single_costs:
+                    Cavg = 0
+                    for i in range(N):
+                        if i != n[0]:
+                            Cavg += CNs[i]
+                    Cavg = Cavg / (N - 1)
+                    fairness_costs.append([n[0], abs((CNs[n[0]] + n[2]) - Cavg)])
+                fairness_costs = sorted(fairness_costs, key=lambda x: x[1])
+                # If the fairness cost is lower, assign it
+                if get_value_by_index(single_costs, fairness_costs[0][0]) - single_costs[0][1] > \
+                        get_value_by_index(fairness_costs, single_costs[0][0]) - fairness_costs[0][1] and \
+                        CNs[single_costs[0][0]] + single_costs[0][2] <= 1:
+                    X[single_costs[0][0], m] = 1
+                    CNs[single_costs[0][0]] += single_costs[0][2]
+                else:
+                    # Else assign the one with the lowest CPU cost
+                    X[fairness_costs[0][0], m] = 1
+                    CNs[fairness_costs[0][0]] += get_cpu_by_index(single_costs, fairness_costs[0][0])
+
+        self.assignX(X, allPOs)
 
     def getAssignedPOs(self):
         POs = []
@@ -111,7 +248,6 @@ class PLDMservice(object):
         sorted_items = sorted(pm_resps.items(), key=lambda item: len(item[1]), reverse=True)
 
         pm_resps_ordered = [(key, value) for key, value in sorted_items]
-
 
         return pm_resps_ordered
 

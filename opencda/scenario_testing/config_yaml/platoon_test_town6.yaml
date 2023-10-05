@@ -144,8 +144,8 @@ vehicle_base:
 
 platoon_base:
   max_capacity: 10
-  inter_gap: 0.2 # desired time gap
-  open_gap: 1.0 # open gap
+  inter_gap: 0.6 # desired time gap
+  open_gap: 1.2 # open gap
   warm_up_speed: 30 # required speed before cooperative merging
 
 
