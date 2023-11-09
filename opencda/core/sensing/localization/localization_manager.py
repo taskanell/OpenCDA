@@ -12,6 +12,7 @@ import carla
 import numpy as np
 import math
 from opencda.core.common.misc import get_speed
+from opencda.core.common.misc import get_acc
 from opencda.core.sensing.localization.localization_debug_helper \
     import LocDebugHelper
 from opencda.core.sensing.localization.kalman_filter import KalmanFilter
@@ -178,6 +179,7 @@ class LocalizationManager(object):
         # speed and transform and current timestamp
         self._ego_pos = None
         self._speed = 0
+        self._prev_speed = deque(maxlen=10)
         self._ego_geoPos = None
         self._ego_acc = 0
 
@@ -209,7 +211,17 @@ class LocalizationManager(object):
         if not self.activate:
             self._ego_pos = self.vehicle.get_transform()
             self._speed = get_speed(self.vehicle)
+            self._prev_speed.append(self._speed)
             self._ego_geoPos = self.map.transform_to_geolocation(self._ego_pos.location)
+
+            if len(self._prev_speed) >= 2:
+                # Calculate the total change in speed and divide by the number of intervals
+                total_speed_change = self._prev_speed[-1] - self._prev_speed[0]
+                self._ego_acc = total_speed_change / (self.dt * (len(self._prev_speed) - 1))
+            else:
+                self._ego_acc = 0.0
+
+            # self._ego_acc = get_acc(self.vehicle)
             # self._ego_acc = math.sqrt(self.imu.accelerometer[0] ** 2 + self.imu.accelerometer[1] ** 2 + self.imu.accelerometer[2] ** 2)
         else:
             speed_true = get_speed(self.vehicle)

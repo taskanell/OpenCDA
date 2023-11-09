@@ -120,7 +120,7 @@ def get_acc(vehicle, meters=False):
     acc = vehicle.get_acceleration()
     acc_meter_per_second = math.sqrt(acc.x ** 2 + acc.y ** 2 + acc.z ** 2)
 
-    return acc_meter_per_second if meters else 3.6 * acc_meter_per_second
+    return acc_meter_per_second
 
 
 def cal_distance_angle(target_location, current_location, orientation):

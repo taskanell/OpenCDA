@@ -50,6 +50,7 @@ class PCservice(object):
         self.front_vehicle = None
         self.front_front_vehicle = None
         self.rear_vehicle = None
+        self.leader_vehicle = None
 
         self.join_req_counter = 0
         self.last_join_req = 0
@@ -193,7 +194,7 @@ class PCservice(object):
         }
         longitudinalControlContainer = {
             'grossCombinationVehicleWeight': False,
-            'currentLongitudinalAcceleration': False,
+            'currentLongitudinalAcceleration': int(self.cav.localizer.get_ego_acc() * 100 /3.6),
             'predictedLongitudinalAcceleration': False,
             'longitudinalSpeed': int(self.cav.localizer.get_ego_spd() * 100 / 3.6),
             'powerToMassRatio': False,
@@ -241,9 +242,11 @@ class PCservice(object):
             if pcm['platoonControlContainer']['platoonPosition'] == self.platoon_position - 1:
                 self.front_vehicle = pcm
             if pcm['platoonControlContainer']['platoonPosition'] == self.platoon_position - 2:
-                self.front_vehicle = pcm
+                self.front_front_vehicle = pcm
             if pcm['platoonControlContainer']['platoonPosition'] == self.platoon_position + 1:
                 self.rear_vehicle = pcm
+            if pcm['platoonControlContainer']['platoonPosition'] == 1:
+                self.leader_vehicle = pcm
         return True
 
     def sendPMM(self, type):

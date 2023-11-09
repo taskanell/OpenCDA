@@ -1,5 +1,5 @@
 import threading
-
+import opencda.core.sensing.perception.sensor_transformation as st
 from opencda.core.common.vehicle_manager import VehicleManager
 from scipy.optimize import linear_sum_assignment as linear_assignment
 # from sklearn.utils.linear_assignment_ import linear_assignment
@@ -26,6 +26,7 @@ from opencda.customize.v2x.LDMutils import compute_IoU
 from opencda.customize.v2x.LDMutils import PO_kalman_filter
 from opencda.customize.v2x.LDMutils import get_o3d_bbx
 from opencda.customize.platooning.states import FSM
+from opencda.customize.platooning.states import I_FSM
 import time
 
 
@@ -101,10 +102,12 @@ class ExtendedVehicleManager(VehicleManager):
         self.PLDM = None
         self.pldm = pldm
         self.platooning = False
+        self.intruder = False
         self.log_dir = log_dir
         self.ms_vanet_agent = ms_vanet
         self.LDM_ids = set(range(1, 256))  # ID pool
         self.time = 0.0
+        self.sensorObjects = []
         # if self.perception_manager.lidar:
         # self.o3d_vis = o3d_visualizer_init(vehicle.id * 1000)
         self.lidar_visualize = config_yaml['sensing']['perception']['lidar']['visualize']
@@ -129,6 +132,9 @@ class ExtendedVehicleManager(VehicleManager):
         elif 'platooning' in application:
             self.platooning = True
 
+        if 'intruder' in application:
+            self.intruder = True
+
         self.v2xAgent = None
         if self.ms_vanet_agent is None:
             self.v2xAgent = V2XAgent(self,
@@ -148,6 +154,10 @@ class ExtendedVehicleManager(VehicleManager):
                 self.agent.v2xAgent.pcService.status = FSM.MAINTINING
             self.agent.v2xAgent.pcService.platoon_position = config_yaml['v2x']['platoon_init_pos']
 
+        if 'intruder' in application:
+            self.agent.v2xAgent.intruderApp.status = I_FSM.IDLE
+            self.agent.v2xAgent.intruderApp.platoon_position = 0
+
         if not self.pldm:
             self.LDM = LDM(self, self.v2xAgent, visualize=self.lidar_visualize)
 
@@ -164,10 +174,12 @@ class ExtendedVehicleManager(VehicleManager):
 
         ego_pos = self.localizer.get_ego_pos()
         ego_spd = self.localizer.get_ego_spd()
+        ego_acc = self.localizer.get_ego_acc()
 
         # print("Vehicle ", self.vehicle.id, " speed: ", ego_spd)
         # object detection
         objects = self.perception_manager.detect(ego_pos)
+        self.sensorObjects = objects['vehicles']
         detected_n = len(objects['vehicles'])
         file_detection = (time.time_ns() / 1000) - file_timestamp
         # ------------------LDM patch------------------------
@@ -218,7 +230,7 @@ class ExtendedVehicleManager(VehicleManager):
 
         self.agent.update_information(ego_pos, ego_spd, objects)
         # pass position and speed info to controller
-        self.controller.update_info(ego_pos, ego_spd)
+        self.controller.update_info(ego_pos, ego_spd, ego_acc)
 
     def clean_platoon_whitelist(self, objects):
         ret_objects = {'vehicles': [], 'traffic_lights': []}
@@ -241,7 +253,9 @@ class ExtendedVehicleManager(VehicleManager):
                 continue  # If object can't be matched with a CARLA vehicle, we ignore it
             dist = math.sqrt(
                 math.pow((obj.location.x - ego_pos.location.x), 2) + math.pow((obj.location.y - ego_pos.location.y),
-                                                                              2))
+                                                                          2))
+            # yaw = self.perception_manager.carla_world.get_actors().find(obj.carla_id).get_transform().rotation.yaw
+            # print("Carla yaw: ", yaw, " Opencda yaw: ", obj.yaw)
             LDMobj = Perception(obj.location.x,
                                 obj.location.y,
                                 obj.bounding_box.extent.x * 2,
@@ -250,6 +264,7 @@ class ExtendedVehicleManager(VehicleManager):
                                 obj.confidence)
             LDMobj.xSpeed = obj.velocity.x
             LDMobj.ySpeed = obj.velocity.y
+            LDMobj.yaw = obj.yaw
             returnedObjects.append(LDMobj)
         return {'vehicles': returnedObjects}
 
@@ -298,40 +313,111 @@ class ExtendedVehicleManager(VehicleManager):
                 break
         return matchedId
 
-    def LDMobj_to_o3d_bbx(self, LDMobj):
-        # o3d bbx test
-        lidarPos = self.perception_manager.lidar.sensor.get_transform()
-        objRelPos = np.array([-1 * (LDMobj.xPosition - lidarPos.location.x),
-                              LDMobj.yPosition - lidarPos.location.y,
-                              1.5 - lidarPos.location.z])
-        min_arr = objRelPos - np.array([LDMobj.width / 2, LDMobj.length / 2, 0.75])
-        max_arr = objRelPos + np.array([LDMobj.width / 2, LDMobj.length / 2, 0.75])
-        # Reshape the array to have a shape of (3, 1)
-        min_arr = min_arr.reshape((3, 1))
-        max_arr = max_arr.reshape((3, 1))
-        # Assign the array to the variable min_bound
-        min_bound = min_arr.astype(np.float64)
-        max_bound = max_arr.astype(np.float64)
-        geometry = o3d.geometry.AxisAlignedBoundingBox(min_bound, max_bound)
-        geometry.color = (0, 1, 0)
-        return geometry
+    # def LDMobj_to_o3d_bbx(self, LDMobj):
+    #     # o3d bbx test
+    #     lidarPos = self.perception_manager.lidar.sensor.get_transform()
+    #     objRelPos = np.array([-1 * (LDMobj.xPosition - lidarPos.location.x),
+    #                           LDMobj.yPosition - lidarPos.location.y,
+    #                           1.5 - lidarPos.location.z])
+    #     min_arr = objRelPos - np.array([LDMobj.width / 2, LDMobj.length / 2, 0.75])
+    #     max_arr = objRelPos + np.array([LDMobj.width / 2, LDMobj.length / 2, 0.75])
+    #     # Reshape the array to have a shape of (3, 1)
+    #     min_arr = min_arr.reshape((3, 1))
+    #     max_arr = max_arr.reshape((3, 1))
+    #     # Assign the array to the variable min_bound
+    #     min_bound = min_arr.astype(np.float64)
+    #     max_bound = max_arr.astype(np.float64)
+    #     geometry = o3d.geometry.AxisAlignedBoundingBox(min_bound, max_bound)
+    #     geometry.color = (0, 1, 0)
+    #     return geometry
 
-    def obj_to_o3d_bbx(self, obj):
+
+    def LDMobj_to_o3d_bbx(self, LDMobj):
         lidarPos = self.perception_manager.lidar.sensor.get_transform()
-        objRelPos = np.array([-1 * (obj.bounding_box.location.x - lidarPos.location.x),
-                              obj.bounding_box.location.y - lidarPos.location.y,
-                              1.5 - lidarPos.location.z])
-        min_arr = objRelPos - np.array([obj.bounding_box.extent.x, obj.bounding_box.extent.y, 0.75])
-        max_arr = objRelPos + np.array([obj.bounding_box.extent.x, obj.bounding_box.extent.y, 0.75])
-        # Reshape the array to have a shape of (3, 1)
-        min_arr = min_arr.reshape((3, 1))
-        max_arr = max_arr.reshape((3, 1))
-        # Assign the array to the variable min_bound
-        min_bound = min_arr.astype(np.float64)
-        max_bound = max_arr.astype(np.float64)
-        geometry = o3d.geometry.AxisAlignedBoundingBox(min_bound, max_bound)
+        translation = [LDMobj.xPosition, LDMobj.yPosition, lidarPos.location.z + 1.5]
+        h, l, w = 1.5, LDMobj.length, LDMobj.width
+        rotation = np.deg2rad(90+LDMobj.yaw)
+
+        # Create a bounding box outline
+        bounding_box = np.array([
+            [-l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2],
+            [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2],
+            [-h / 2, -h / 2, -h / 2, -h / 2, h / 2, h / 2, h / 2, h / 2]])
+
+        # Standard 3x3 rotation matrix around the Z axis
+        rotation_matrix = np.array([
+            [np.cos(rotation), -np.sin(rotation), 0.0],
+            [np.sin(rotation), np.cos(rotation), 0.0],
+            [0.0, 0.0, 1.0]])
+
+        # Repeat the [x, y, z] eight times
+        eight_points = np.tile(translation, (8, 1))
+
+        # Translate the rotated bounding box by the
+        # original center position to obtain the final box
+        corner_box = np.dot(
+            rotation_matrix, bounding_box) + eight_points.transpose()
+
+        new_element = np.array([[1, 1, 1, 1, 1, 1, 1, 1]])
+        corner_box = np.append(corner_box, new_element, axis=0)
+
+        corner_box_sensor = st.world_to_sensor(corner_box, lidarPos)
+
+        corner_box_sensor[:1, :] = - corner_box_sensor[:1, :]
+        corner_box_sensor = corner_box_sensor[:-1, :]
+        corner_box_sensor = corner_box_sensor.transpose()
+
+        lines = [[0, 1], [1, 2], [2, 3], [0, 3],
+                 [4, 5], [5, 6], [6, 7], [4, 7],
+                 [0, 4], [1, 5], [2, 6], [3, 7]]
+
+        # Use the same color for all lines
+        colors = [[1, 0, 0] for _ in range(len(lines))]
+
+        line_set = o3d.geometry.LineSet()
+        line_set.points = o3d.utility.Vector3dVector(corner_box_sensor)
+        line_set.lines = o3d.utility.Vector2iVector(lines)
+        line_set.colors = o3d.utility.Vector3dVector(colors)
+
+        yaw = np.deg2rad(LDMobj.yaw)
+        c, s = np.cos(yaw), np.sin(yaw)
+        R = np.array([[c, -s], [s, c]])
+        local_corners = np.array([
+            [-LDMobj.width / 2, -LDMobj.length / 2],
+            [LDMobj.width / 2, -LDMobj.length / 2],
+            [LDMobj.width / 2, LDMobj.length / 2],
+            [-LDMobj.width / 2, LDMobj.length / 2]
+        ])
+        world_corners = np.dot(R, local_corners.T).T + np.array([LDMobj.xPosition, LDMobj.yPosition])
+
+        min_boundary = np.array([np.min(world_corners, axis=0)[0],
+                                 np.min(world_corners, axis=0)[1],
+                                 lidarPos.location.z,
+                                 1])
+        max_boundary = np.array([np.max(world_corners, axis=0)[0],
+                                 np.max(world_corners, axis=0)[1],
+                                 lidarPos.location.z + 1.5,
+                                 1])
+        min_boundary = min_boundary.reshape((4, 1))
+        max_boundary = max_boundary.reshape((4, 1))
+        stack_boundary = np.hstack((min_boundary, max_boundary))
+        # the boundary coord at the lidar sensor space
+        stack_boundary_sensor_cords = st.world_to_sensor(stack_boundary,
+                                                         lidarPos)
+        # convert unreal space to o3d space
+        stack_boundary_sensor_cords[:1, :] = - \
+            stack_boundary_sensor_cords[:1, :]
+        # (4,2) -> (3, 2)
+        stack_boundary_sensor_cords = stack_boundary_sensor_cords[:-1, :]
+
+        min_boundary_sensor = np.min(stack_boundary_sensor_cords, axis=1)
+        max_boundary_sensor = np.max(stack_boundary_sensor_cords, axis=1)
+
+        geometry = o3d.geometry.AxisAlignedBoundingBox(min_boundary_sensor, max_boundary_sensor)
+        # geometry = o3d.geometry.AxisAlignedBoundingBox(min_bound, max_bound)
         geometry.color = (0, 1, 0)
-        return geometry
+
+        return geometry, line_set
 
     def LDMobj_to_min_max(self, LDMobj):
         # o3d bbx test

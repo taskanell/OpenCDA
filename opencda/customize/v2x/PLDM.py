@@ -21,6 +21,7 @@ from scipy.optimize import linear_sum_assignment as linear_assignment
 from opencda.customize.v2x.aux import newPLDMentry
 from opencda.customize.v2x.LDMutils import PO_kalman_filter
 from opencda.customize.v2x.LDMutils import obj_to_o3d_bbx
+from opencda.customize.v2x.aux import ColorGradient
 
 
 class PLDM(object):
@@ -39,6 +40,7 @@ class PLDM(object):
         self.V2Xagent = V2Xagent
         self.pmMap = {}
         self.leader = leader
+        self.colorGradient = ColorGradient(10)
         if visualize:
             self.o3d_vis = o3d_visualizer_init(cav.vehicle.id * 100)
         # if log:
@@ -91,7 +93,7 @@ class PLDM(object):
                 PLDMobj.perception.xSpeed, \
                 PLDMobj.perception.ySpeed, \
                 PLDMobj.perception.xacc, \
-                PLDMobj.perception.yacc = self.PLDM[ID].kalman_filter.predict()
+                PLDMobj.perception.yacc = self.PLDM[ID].kalman_filter.predict(self.cav.get_time_ms())
             PLDMobj.perception.o3d_bbx = self.cav.LDMobj_to_o3d_bbx(PLDMobj.perception)
             PLDMobj.perception.timestamp = self.cav.time
 
@@ -216,7 +218,7 @@ class PLDM(object):
 
         obj.o3d_bbx = LDMobj_to_o3d_bbx(self.cav, obj)
 
-        x, y, vx, vy, ax, ay = self.PLDM[id].kalman_filter.update(obj.xPosition, obj.yPosition)
+        x, y, vx, vy, ax, ay = self.PLDM[id].kalman_filter.update(obj.xPosition, obj.yPosition, self.cav.get_time_ms())
         # print('KFupdate: ', "x: ", x, ",y: ", y, ",vx: ", vx, ",vy: ", vy, ",ax: ", ax, ",ay: ", ay)
         obj.xPosition = x
         obj.yPosition = y
@@ -290,3 +292,10 @@ class PLDM(object):
             retObjects.append(object)
 
         return {'vehicles': retObjects, 'traffic_lights': trafficLights}
+
+    def getAllPOs(self):
+        POs = []
+        for ID, PLDMobj in self.PLDM.items():
+            if PLDMobj.detected:
+                POs.append(PLDMobj)
+        return POs

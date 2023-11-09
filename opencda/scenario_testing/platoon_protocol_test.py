@@ -51,7 +51,7 @@ def run_scenario(opt, scenario_params):
                               current_time=scenario_params['current_time'])
 
         spectator = scenario_manager.world.get_spectator()
-        spectator_vehicle = single_cav_list[0].vehicle
+        spectator_vehicle = single_cav_list[2].vehicle
         last_time = time.time_ns() / 1000000
 
         while True:
@@ -61,7 +61,7 @@ def run_scenario(opt, scenario_params):
             last_time = time.time_ns() / 1000000
             transform = spectator_vehicle.get_transform()
             spectator.set_transform(carla.Transform(transform.location +
-                                                    carla.Location(z=80),
+                                                    carla.Location(z=100),
                                                     carla.Rotation(pitch=-90)))
 
             for i, single_cav in enumerate(single_cav_list):

@@ -97,6 +97,7 @@ class CPservice(object):
             # For debugging
             POs.append({'ObjectID': int(LDMobj.id),
                         'Heading': int(heading * 10),  # In degrees/10
+                        'Yaw': int(LDMobj.perception.yaw * 10),  # In degrees/10
                         'xSpeed': int(LDMobj.perception.xSpeed * 100),  # Centimeters per second
                         'ySpeed': int(LDMobj.perception.ySpeed * 100),  # Centimeters per second
                         'xAcceleration': int(LDMobj.perception.xacc * 100),
@@ -182,6 +183,7 @@ class CPservice(object):
                 newPO.yacc = float(CPMobj['yAcceleration']) / 100
                 # print('[CPM] ' + str(newPO.id) + ' speed: ' + str(newPO.xSpeed) + ',' + str(newPO.ySpeed))
                 newPO.heading = math.degrees(float(CPMobj['Heading']) / 10)
+                newPO.yaw = math.degrees(float(CPMobj['Yaw']) / 10)
                 newPOs.append(newPO)
             t_parse += time.time_ns() / 1000 - init_t
             init_t = time.time_ns() / 1000

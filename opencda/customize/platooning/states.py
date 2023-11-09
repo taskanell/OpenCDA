@@ -60,3 +60,10 @@ class FSM(Enum):
     LEAVE_REQUEST = 14
     LEAVE = 15
 
+
+class I_FSM(Enum):
+    IDLE = 0
+    BEGIN = 1
+    INTRUDE = 2
+    INTRUDING = 3
+    FINISH = 4

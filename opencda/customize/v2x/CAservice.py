@@ -87,12 +87,13 @@ class CAservice(object):
                                math.radians(carlaTransform.rotation.yaw)),
                            carlaTransform.rotation.yaw,
                            ID=CAM['stationID'])
+        newCV.yaw = carlaTransform.rotation.yaw
         # print('Vehicle ' + str(self.cav.vehicle.id) + ' received CAM from vehicle ' + str(CAM['stationID']))
         self.cav.ldm_mutex.acquire()
         # ldm_id = CAMfusion(self.cav, newCV)
         ldm_id = self.cav.LDM.CAMfusion(newCV)
         self.cav.ldm_mutex.release()
-        if CAM['isJoinable'] is True:
+        if CAM['isJoinable'] is True and self.V2Xagent.pcService is not None:
             self.V2Xagent.pcService.updateJoinableList(ldm_id)
         return True
 
@@ -120,6 +121,8 @@ class CAservice(object):
         }
         if self.V2Xagent.pcService is not None:
             cam['isJoinable'] = True if self.V2Xagent.pcService.getIsJoinable() else False
+        else:
+            cam['isJoinable'] = False
 
         # print('Vehicle ' + str(self.cav.vehicle.id) + ' sent CAM')
         self.prev_heading = self.cav.localizer.get_ego_pos().rotation.yaw

@@ -28,7 +28,6 @@ def is_vehicle_cococlass(label):
     vehicle_class_array = np.array([1, 2, 3, 5, 7], dtype=np.int)
     return True if 0 in (label - vehicle_class_array) else False
 
-
 class BoundingBox(object):
     """
     Bounding box class for obstacle vehicle.
@@ -110,6 +109,8 @@ class ObstacleVehicle(object):
             self.o3d_bbx = o3d_bbx
             self.carla_id = -1
             self.velocity = carla.Vector3D(0.0, 0.0, 0.0)
+            self.yaw = 0.0
+            self.o3d_obb = None
             self.confidence = confidence
         else:
             if sumo2carla_ids is None:
@@ -180,6 +181,7 @@ class ObstacleVehicle(object):
         """
         self.location = vehicle.get_location()
         self.transform = vehicle.get_transform()
+        self.yaw = self.transform.rotation.yaw
         self.bounding_box = vehicle.bounding_box
         self.carla_id = vehicle.id
         self.type_id = vehicle.type_id
@@ -197,14 +199,36 @@ class ObstacleVehicle(object):
                 speed_vector = carla.Vector3D(sumo_speed, 0, 0)
                 self.set_velocity(speed_vector)
 
+        yaw = np.deg2rad(self.transform.rotation.yaw)
+        c, s = np.cos(yaw), np.sin(yaw)
+        R = np.array([[c, -s], [s, c]])
+        local_corners = np.array([
+            [-self.bounding_box.extent.x, -self.bounding_box.extent.y],
+            [self.bounding_box.extent.x, -self.bounding_box.extent.y],
+            [self.bounding_box.extent.x, self.bounding_box.extent.y],
+            [-self.bounding_box.extent.x, self.bounding_box.extent.y]
+        ])
+        world_corners = np.dot(R, local_corners.T).T + np.array([self.location.x, self.location.y])
+
+
         # find the min and max boundary
-        min_boundary = np.array([self.location.x - self.bounding_box.extent.x,
-                                 self.location.y - self.bounding_box.extent.y,
+        # min_boundary = np.array([self.location.x - self.bounding_box.extent.x,
+        #                          self.location.y - self.bounding_box.extent.y,
+        #                          self.location.z + self.bounding_box.location.z
+        #                          - self.bounding_box.extent.z,
+        #                          1])
+        # max_boundary = np.array([self.location.x + self.bounding_box.extent.x,
+        #                          self.location.y + self.bounding_box.extent.y,
+        #                          self.location.z + self.bounding_box.location.z
+        #                          + self.bounding_box.extent.z,
+        #                          1])
+        min_boundary = np.array([np.min(world_corners, axis=0)[0],
+                                 np.min(world_corners, axis=0)[1],
                                  self.location.z + self.bounding_box.location.z
                                  - self.bounding_box.extent.z,
                                  1])
-        max_boundary = np.array([self.location.x + self.bounding_box.extent.x,
-                                 self.location.y + self.bounding_box.extent.y,
+        max_boundary = np.array([np.max(world_corners, axis=0)[0],
+                                 np.max(world_corners, axis=0)[1],
                                  self.location.z + self.bounding_box.location.z
                                  + self.bounding_box.extent.z,
                                  1])
@@ -231,3 +255,4 @@ class ObstacleVehicle(object):
                                                 max_bound=max_boundary_sensor)
         aabb.color = (1, 0, 0)
         self.o3d_bbx = aabb
+

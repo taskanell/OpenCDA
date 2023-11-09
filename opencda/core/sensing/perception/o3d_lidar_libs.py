@@ -13,7 +13,7 @@ import numpy as np
 import open3d as o3d
 from matplotlib import cm
 from scipy.stats import mode
-
+from opencda.customize.v2x.aux import PLDMentry
 import opencda.core.sensing.perception.sensor_transformation as st
 from opencda.core.sensing.perception.obstacle_vehicle import \
     is_vehicle_cococlass, ObstacleVehicle
@@ -101,7 +101,7 @@ def o3d_visualizer_init(actor_id):
                       height=800,
                       left=480,
                       top=270)
-    vis.get_render_option().background_color = [0.05, 0.05, 0.05]
+    vis.get_render_option().background_color = [0, 0, 0]
     vis.get_render_option().point_size = 1
     vis.get_render_option().show_coordinate_frame = True
 
@@ -131,7 +131,7 @@ def o3d_visualizer_show(vis, count, point_cloud, objects, LDM=False):
     -------
 
     """
-    point_cloud.paint_uniform_color([0, 1, 1])
+    point_cloud.paint_uniform_color([1, 1, 0])
     if count == 2:
         vis.add_geometry(point_cloud)
 
@@ -203,7 +203,7 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
     -------
 
     """
-
+    point_cloud.paint_uniform_color([0, 1, 1])
     if count == 10:
         vis.add_geometry(point_cloud)
 
@@ -215,20 +215,44 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
         if key != 'vehicles':
             continue
         for object_ in object_list:
-            geometry = object_.perception.o3d_bbx
-            if not object_.tracked:
-                continue
-            if object_.detected and object_.onSight:
-                geometry.color = (0, 1, 0)
-            elif not object_.detected:
-                geometry.color = (1, 0, 1)
-            elif object_.CPM:
-                geometry.color = (1, 0.7, 0)
+            if object_.perception.line_set is not None:
+                geometry = object_.perception.line_set
+                if not object_.tracked:
+                    continue
+                if object_.detected and object_.onSight:
+                    colors = [[1, 0, 0] for _ in range(12)]
+                    geometry.colors = o3d.utility.Vector3dVector(colors)
+                elif not object_.detected:
+                    colors = [[0, 1, 0] for _ in range(12)]
+                    geometry.colors = o3d.utility.Vector3dVector(colors)
+                elif object_.CPM:
+                    colors = [[0.7, 0, 0] for _ in range(12)]
+                    geometry.colors = o3d.utility.Vector3dVector(colors)
+                elif isinstance(object_, PLDMentry) and object_.assignedPM is not None:
+                    colors = [[1, 0, 0] for _ in range(12)]
+                    geometry.colors = o3d.utility.Vector3dVector(colors)
+                else:
+                    colors = [[0.5, 0, 0] for _ in range(12)]
+                    geometry.colors = o3d.utility.Vector3dVector(colors)
             else:
-                geometry.color = (1, 0, 0)
+                geometry = object_.perception.o3d_bbx
+                if not object_.tracked:
+                    continue
+                if object_.detected and object_.onSight:
+                    geometry.color = (1, 0, 0)
+                elif not object_.detected:
+                    geometry.color = (0, 1, 0)
+                elif object_.CPM:
+                    geometry.color = (0.7, 0, 0)
+                elif isinstance(object_, PLDMentry) and object_.assignedPM is not None:
+                    geometry.color = (1, 0, 0)
+                else:
+                    geometry.color = (0.5, 0, 0)
             vis.add_geometry(geometry)
 
             LDM_geometries.append(geometry)
+
+    # vis.add_geometry(test_rotation())
 
     for key, object_list in groundTruth.items():
         # we only draw vehicles for now
@@ -236,7 +260,7 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
             continue
         for object_ in object_list:
             geometry = object_.o3d_bbx
-            geometry.color = (0, 0, 1)
+            geometry.color = (0.3, 0.3, 0.3)
             vis.add_geometry(geometry)
             LDM_geometries.append(geometry)
 
@@ -249,11 +273,58 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
         vis.remove_geometry(geometry)
 
 
+def test_rotation():
+    box = [0, 0, 0, 3, 5, 2, np.deg2rad(45)]
+    corner_boxes = np.zeros((8, 3))
+
+    translation = box[0:3]
+    h, w, l = box[3], box[4], box[5]
+    rotation = box[6]
+
+    # Create a bounding box outline
+    bounding_box = np.array([
+        [-l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2],
+        [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2],
+        [-h / 2, -h / 2, -h / 2, -h / 2, h / 2, h / 2, h / 2, h / 2]])
+
+    # Standard 3x3 rotation matrix around the Z axis
+    rotation_matrix = np.array([
+        [np.cos(rotation), -np.sin(rotation), 0.0],
+        [np.sin(rotation), np.cos(rotation), 0.0],
+        [0.0, 0.0, 1.0]])
+
+    # Repeat the [x, y, z] eight times
+    eight_points = np.tile(translation, (8, 1))
+
+    # Translate the rotated bounding box by the
+    # original center position to obtain the final box
+    corner_box = np.dot(
+        rotation_matrix, bounding_box) + eight_points.transpose()
+
+    corner_box = corner_box.transpose()
+
+    # Our lines span from points 0 to 1, 1 to 2, 2 to 3, etc...
+    lines = [[0, 1], [1, 2], [2, 3], [0, 3],
+             [4, 5], [5, 6], [6, 7], [4, 7],
+             [0, 4], [1, 5], [2, 6], [3, 7]]
+
+    # Use the same color for all lines
+    colors = [[1, 0, 0] for _ in range(len(lines))]
+
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(corner_box)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    line_set.colors = o3d.utility.Vector3dVector(colors)
+
+    return line_set
+
+
 def o3d_camera_lidar_fusion(objects,
                             yolo_bbx,
                             lidar_3d,
                             projected_lidar,
-                            lidar_sensor):
+                            lidar_sensor,
+                            ego_pos = None):
     """
     Utilize the 3D lidar points to extend the 2D bounding box
     from camera to 3D bounding box under world coordinates.
@@ -276,6 +347,8 @@ def o3d_camera_lidar_fusion(objects,
     lidar_sensor : carla.sensor
         The lidar sensor.
 
+    ego_pos : carla.transform
+        The ego vehicle's transform.
     Returns
     -------
     objects : dict
@@ -318,7 +391,7 @@ def o3d_camera_lidar_fusion(objects,
                         (np.abs(select_points[:, 1]) < y_common + 3)
         select_points = select_points[points_inlier]
 
-        if select_points.shape[0] < 2:
+        if select_points.shape[0] < 4:
             continue
 
         # to visualize 3d lidar points in o3d visualizer, we need to
@@ -333,6 +406,15 @@ def o3d_camera_lidar_fusion(objects,
         aabb = o3d_pointcloud.get_axis_aligned_bounding_box()
         aabb.color = (1, 0, 0)
 
+        obb = None
+        if np.asarray(o3d_pointcloud.points).shape[0] >= 4:
+            try:
+                obb = o3d_pointcloud.get_oriented_bounding_box()
+                obb.color = (0, 1, 0)
+            except RuntimeError as e:
+                # print("Unable to compute the oriented bounding box:", e)
+                pass
+
         # get the eight corner of the bounding boxes.
         corner = np.asarray(aabb.get_box_points())
         # covert back to unreal coordinate
@@ -346,6 +428,10 @@ def o3d_camera_lidar_fusion(objects,
 
         if is_vehicle_cococlass(label):
             obstacle_vehicle = ObstacleVehicle(corner, aabb, confidence=confidence)
+            if obb is not None:
+                obstacle_vehicle.o3d_obb = obb
+                yaw = ego_pos.rotation.yaw - np.degrees(np.arctan2(np.array(obb.R)[1, 0], np.array(obb.R)[0, 0]))
+                obstacle_vehicle.yaw = yaw
             if 'vehicles' in objects:
                 objects['vehicles'].append(obstacle_vehicle)
             else:

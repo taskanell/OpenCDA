@@ -32,15 +32,22 @@ class ControlManager(object):
                 controller_type), 'Controller')
         self.controller = controller(control_config['args'])
 
-    def update_info(self, ego_pos, ego_speed):
+    def update_info(self, ego_pos, ego_speed, ego_acceleration):
         """
         Update ego vehicle information for controller.
         """
-        self.controller.update_info(ego_pos, ego_speed)
+        self.controller.update_info(ego_pos, ego_speed, ego_acceleration)
 
     def run_step(self, target_speed, waypoint):
         """
         Execute current controller step.
         """
         control_command = self.controller.run_step(target_speed, waypoint)
+        return control_command
+
+    def run_step(self, target_speed, waypoint, target_acceleration=None):
+        """
+        Execute current controller step.
+        """
+        control_command = self.controller.run_step(target_speed, waypoint, target_acceleration)
         return control_command

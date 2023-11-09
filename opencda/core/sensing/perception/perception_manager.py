@@ -528,7 +528,8 @@ class PerceptionManager:
                 yolo_detection.xyxy[i],
                 data_copy,
                 projected_lidar,
-                self.lidar.sensor)
+                self.lidar.sensor,
+                self.ego_pos)
 
             # calculate the speed. current we retrieve from the server
             # directly.
@@ -600,7 +601,7 @@ class PerceptionManager:
 
         vehicle_list = world.get_actors().filter("*vehicle*")
         # todo: hard coded
-        thresh = 50 if not self.data_dump else 120
+        thresh = 30 if not self.data_dump else 30
 
         vehicle_list = [v for v in vehicle_list if self.dist(v) < thresh and
                         v.id != self.id]

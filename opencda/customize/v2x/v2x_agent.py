@@ -12,6 +12,7 @@ from opencda.customize.v2x.CAservice import CAservice
 from opencda.customize.v2x.CPservice import CPservice
 from opencda.customize.v2x.PCservice import PCservice
 from opencda.customize.v2x.PLDMservice import PLDMservice
+from opencda.customize.v2x.intruderApp import IntruderApp
 from proton.reactor import AtMostOnce
 
 import os, sys, math
@@ -179,16 +180,20 @@ def receiver_zmq(agent):
             if msg['type'] == 'CAM':
                 agent.caService.processCAM(msg)
                 writeLog(agent, 'CAM', file_t, 1, agent.cav.LDM.get_LDM_size())
-            if msg['type'] == 'CPM':
+            if msg['type'] == 'CPM' and agent.intruderApp is None:
                 t_parse, t_fusion = agent.cpService.processCPM(msg)
                 writeLog(agent, 'CPM', file_t, len(msg['perceivedObjects']),
                          agent.cav.LDM.get_LDM_size(),
                          CPMparse=t_parse,
                          CPMfusion=t_fusion)
             if msg['type'] == 'PCM':
-                agent.pcService.processPCM(msg)
+                if agent.pcService is not None:
+                    agent.pcService.processPCM(msg)
+                elif agent.intruderApp is not None:
+                    agent.intruderApp.processPCM(msg)
             if msg['type'] == 'PMM':
-                agent.pcService.processPMM(msg)
+                if agent.pcService is not None:
+                    agent.pcService.processPMM(msg)
 
 
 class V2XAgent(object):
@@ -238,6 +243,10 @@ class V2XAgent(object):
         self.pcService = None
         if self.cav.platooning:
             self.pcService = PCservice(cav, self)
+        self.intruderApp = None
+        if self.cav.intruder:
+            self.intruderApp = IntruderApp(cav, self)
+
         self.PLDM = PLDM
         if self.PLDM:
             self.pldmService = PLDMservice(cav, self)
@@ -281,16 +290,16 @@ class V2XAgent(object):
         if self.PLDM:
             self.pldmService.runStep()
         # TODO: put both CA and CP services in a separate thread so they don't slow down the simulation
-        if self.caService.checkCAMconditions():
+        if self.caService.checkCAMconditions() and self.intruderApp is None:
             # self.AMQPhandler.cam_sender(self.caService.generateCAM())
             self.send_buffer.append(self.caService.generateCAM())
             self.send_event.set()
         CPM = False
         if not self.PLDM:
             CPM = self.cpService.checkCPMconditions()
-        elif (self.cav.time * 1000) - self.cpService.last_cpm > 100:
-            CPM = self.pldmService.pldm.getCPM()
-        if CPM is not False:
+        # elif (self.cav.time * 1000) - self.cpService.last_cpm > 100:
+        #     CPM = self.pldmService.pldm.getCPM()
+        if CPM is not False and self.intruderApp is None:
             # self.AMQPhandler.cpm_sender(self.cpService.generateCPM())
             self.send_buffer.append(self.cpService.generateCPM(CPM))
             self.send_event.set()
@@ -298,3 +307,6 @@ class V2XAgent(object):
         if self.pcService is not None and self.time > 1:
             self.pcService.run_step()
             print('[Vehicle ', self.cav.vehicle.id, ']: ', self.pcService.status)
+        if self.intruderApp is not None:
+            self.intruderApp.run_step()
+            print('[Vehicle ', self.cav.vehicle.id, ']: ', self.intruderApp.status)

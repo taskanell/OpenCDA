@@ -14,7 +14,7 @@ from opencda.customize.v2x.aux import newPLDMentry
 import time
 import numpy as np
 import random
-
+import copy
 
 def cpu_cost_single(P, alpha, gamma, n, m):
     return (alpha[n] + gamma[n] * np.sum(P, axis=0)[m]) / 100
@@ -59,6 +59,7 @@ class PLDMservice(object):
         self.leaderSeqNum = 0
         self.recvSeqNum = 0
         self.recv_plu = 0
+        self.recv_plu_ids = []
         self.recv_pmu = {}
         self.last_plu = 0
         self.last_pmu = 0
@@ -73,12 +74,12 @@ class PLDMservice(object):
         self.pldm.leader = leader
 
     def runStep(self):
-        if self.leader and (self.cav.time * 1000) - self.last_plu > 100:
+        if self.leader and self.cav.get_time_ms() - self.last_plu > 100:
             # if len(set(self.recv_pmu.values())) <= 1:
             # Only send PLU if we have received a PMU from all PMs
             self.generatePLU()
             self.leaderSeqNum += 1
-        if self.leader and self.cav.get_time_ms() - self.last_assigment > 1000:
+        if self.leader and self.cav.get_time_ms() - self.last_assigment > 2000:
             self.assignPOs()
             self.last_assigment = self.cav.get_time_ms()
 
@@ -86,7 +87,7 @@ class PLDMservice(object):
         self.optDwell()
         self.balance_resp_pos()
 
-        # self.opt_assginment()
+        #self.opt_assginment()
 
         # For debugging
         resp = self.get_all_PM_resp_state()
@@ -131,7 +132,7 @@ class PLDMservice(object):
         for i in range(len(X)):
             for j in range(len(X[i])):
                 if X[i][j] == 1:
-                    self.pldm.PLDM[allPOs[j].ID].assignedPM = self.PMs[i]
+                    self.pldm.PLDM[allPOs[j].id].assignedPM = self.PMs[i]
 
     def opt_assginment(self):
         allPOs = self.getAllPOs()
@@ -301,6 +302,8 @@ class PLDMservice(object):
                 'altitude': geoPos.altitude,
                 'longitude': int(geoPos.longitude * 10000000),  # 0,1 microdegrees
                 'latitude': int(geoPos.latitude * 10000000),  # 0,1 microdegrees
+                'carlaX': LDMobj.perception.xPosition,
+                'carlaY': LDMobj.perception.yPosition
             }
             # speed = math.sqrt(math.pow(LDMobj.perception.xSpeed, 2) + math.pow(LDMobj.perception.ySpeed, 2))
 
@@ -341,6 +344,10 @@ class PLDMservice(object):
                'CVs': CVs,
                'seqNum': self.leaderSeqNum}
 
+        print('Vehicle ', self.cav.vehicle.id, ':')
+        print('POs')
+        for PO in POs:
+            print(PO)
         self.last_plu = self.cav.time * 1000
         # self.V2Xagent.AMQPhandler.platoonControl_sender(PLU)
         self.V2Xagent.send_buffer.append(PLU)
@@ -375,6 +382,8 @@ class PLDMservice(object):
                     'altitude': geoPos.altitude,
                     'longitude': int(geoPos.longitude * 10000000),  # 0,1 microdegrees
                     'latitude': int(geoPos.latitude * 10000000),  # 0,1 microdegrees
+                    'carlaX': LDMobj.perception.xPosition,
+                    'carlaY': LDMobj.perception.yPosition
                 }
                 # speed = math.sqrt(math.pow(LDMobj.perception.xSpeed, 2) + math.pow(LDMobj.perception.ySpeed, 2))
 
@@ -408,6 +417,16 @@ class PLDMservice(object):
                'newPOs': newPOs,
                'PMstate': PMstate,
                'seqNum': self.recvSeqNum}
+        print('Vehicle ', self.cav.vehicle.id, ':')
+        if assignedPOs:
+            print('Assigned POs')
+        for PO in assignedPOs:
+            print(PO)
+        if newPOs:
+            print('New POs')
+        for PO in newPOs:
+            print(PO)
+        print(PMstate)
 
         self.last_pmu = self.cav.time * 1000
         # self.V2Xagent.AMQPhandler.platoonControl_sender(PMU)
@@ -425,6 +444,40 @@ class PLDMservice(object):
         t_update = 0
         t_new = 0
         self.cav.pldm_mutex.acquire()
+        newPLUids = []
+        if 'perceivedObjects' in PLU:
+            for PLUobj in PLU['perceivedObjects']:
+                if PLUobj['ObjectID'] in self.recv_plu_ids:
+                    continue
+                else:
+                    self.recv_plu_ids.append(PLUobj['ObjectID'])
+                    newPLUids.append(PLUobj)
+            for PLUobj in newPLUids:
+                carlaX, carlaY, carlaZ = geo_to_transform(float(PLUobj['referencePosition']['latitude']) / 10000000,
+                                                          float(
+                                                              PLUobj['referencePosition']['longitude']) / 10000000,
+                                                          PLUobj['referencePosition']['altitude'],
+                                                          self.cav.localizer.geo_ref.latitude,
+                                                          self.cav.localizer.geo_ref.longitude, 0.0)
+                newPO = Perception(carlaX,
+                                   carlaY,
+                                   float(PLUobj['vehicleWidth']) / 10,
+                                   float(PLUobj['vehicleLength']) / 10,
+                                   float(PLUobj['timestamp']) / 1000,
+                                   PLUobj['confidence'])
+                IoU_map, new, matched, pldm_ids = self.match_PLDMObject([newPO])
+                if IoU_map is not None:
+                    if IoU_map[matched[0], new[0]] >= 0:
+                        # If this object is already perceived by PM, delete old entry
+                        del self.pldm.PLDM[pldm_ids[matched[0]]]
+            for PLUobj in newPLUids:
+                if PLUobj['ObjectID'] in self.pldm.PLDM:
+                    newID= self.pldm.PLDM_ids.pop()
+                    self.pldm.PLDM[newID] = copy.deepcopy(self.pldm.PLDM[PLUobj['ObjectID']])
+                    self.pldm.PLDM[newID].id = newID
+                    self.pldm.PLDM[newID].newPO = True
+                    del self.pldm.PLDM[PLUobj['ObjectID']]
+
         PLU_ids = []
         if 'perceivedObjects' in PLU:
             init_t = time.time_ns() / 1000
@@ -459,9 +512,10 @@ class PLDMservice(object):
                     newPO.yacc = float(PLUobj['yAcceleration']) / 100
                     newPO.o3d_bbx = get_o3d_bbx(self.cav, carlaX, carlaY, newPO.width, newPO.length)
 
-                    self.pldm.PLDM[PLUobj['ObjectID']].kalman_filter.predict()
+                    self.pldm.PLDM[PLUobj['ObjectID']].kalman_filter.predict(self.cav.get_time_ms())
                     x, y, vx, vy, ax, ay = self.pldm.PLDM[PLUobj['ObjectID']].kalman_filter.update(newPO.xPosition,
-                                                                                                   newPO.yPosition)
+                                                                                                   newPO.yPosition,
+                                                                                                   self.cav.get_time_ms())
                     self.pldm.PLDM[PLUobj['ObjectID']].perception.xPosition = x
                     self.pldm.PLDM[PLUobj['ObjectID']].perception.yPosition = y
                     self.pldm.PLDM[PLUobj['ObjectID']].perception.xSpeed = vx
@@ -582,9 +636,10 @@ class PLDMservice(object):
                 PO.o3d_bbx = get_o3d_bbx(self.cav, carlaX, carlaY, PO.width, PO.length)
 
                 if PMUobj['ObjectID'] in self.pldm.PLDM:
-                    self.pldm.PLDM[PMUobj['ObjectID']].kalman_filter.predict()
+                    self.pldm.PLDM[PMUobj['ObjectID']].kalman_filter.predict(self.cav.get_time_ms())
                     x, y, vx, vy, ax, ay = self.pldm.PLDM[PMUobj['ObjectID']].kalman_filter.update(PO.xPosition,
-                                                                                                   PO.yPosition)
+                                                                                                   PO.yPosition,
+                                                                                                   self.cav.get_time_ms())
                     self.pldm.PLDM[PMUobj['ObjectID']].perception.xPosition = x
                     self.pldm.PLDM[PMUobj['ObjectID']].perception.yPosition = y
                     self.pldm.PLDM[PMUobj['ObjectID']].perception.xSpeed = vx
@@ -861,9 +916,10 @@ class PLDMservice(object):
                                         CAMobject.length)
         if CAMobject.id in self.pldm.PLDM:
             # If this is not the first CAM
-            self.pldm.PLDM[CAMobject.id].kalman_filter.predict()
+            self.pldm.PLDM[CAMobject.id].kalman_filter.predict(self.cav.get_time_ms())
             x, y, vx, vy, ax, ay = self.pldm.PLDM[CAMobject.id].kalman_filter.update(CAMobject.xPosition,
-                                                                                     CAMobject.yPosition)
+                                                                                     CAMobject.yPosition,
+                                                                                     self.cav.get_time_ms())
             # print('KFupdate: ', "x: ", x, ",y: ", y, ",vx: ", vx, ",vy: ", vy, ",ax: ", ax, ",ay: ", ay)
             CAMobject.xPosition = x
             CAMobject.yPosition = y

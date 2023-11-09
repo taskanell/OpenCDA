@@ -56,6 +56,7 @@ class Controller:
         self._lon_k_i = args['lon']['k_i']
 
         self._lon_ebuffer = deque(maxlen=10)
+        self._acc_ebuffer = deque(maxlen=10)
 
         # lateral related
         self.max_steering = args['max_steering']
@@ -72,6 +73,8 @@ class Controller:
         # current speed and localization retrieved from sensing layer
         self.current_transform = None
         self.current_speed = 0.
+        self.previous_speed = 0.
+        self.current_acceleration = 0.
         # past steering
         self.past_steering = 0.
 
@@ -83,7 +86,7 @@ class Controller:
         """
         pass
 
-    def update_info(self, ego_pos, ego_spd):
+    def update_info(self, ego_pos, ego_spd, ego_acc):
         """
         Update ego position and speed to controller.
 
@@ -101,7 +104,9 @@ class Controller:
         """
 
         self.current_transform = ego_pos
+        self.previous_speed = self.current_speed
         self.current_speed = ego_spd
+        self.current_acceleration = ego_acc
         if self.dynamic:
             self.dynamic_pid()
 
@@ -126,6 +131,37 @@ class Controller:
         if len(self._lat_ebuffer) >= 2:
             _de = (self._lat_ebuffer[-1] - self._lat_ebuffer[-2]) / self.dt
             _ie = sum(self._lat_ebuffer) * self.dt
+        else:
+            _de = 0.0
+            _ie = 0.0
+
+        return np.clip((self._lat_k_p * error) +
+                       (self._lat_k_d * _de) +
+                       (self._lat_k_i * _ie),
+                       -1.0, 1.0)
+
+    def acc_run_step(self, target_acc):
+        """
+
+        Parameters
+        ----------
+        target_speed : float
+            Target speed of the ego vehicle.
+
+        Returns
+        -------
+        acceleration : float
+            Desired acceleration value for the current step
+            to achieve target speed.
+
+        """
+        #error = target_acc - self.current_acceleration / 3.6
+        error = target_acc - (self.current_speed - self.previous_speed) / 3.6 * self.dt
+        self._acc_ebuffer.append(error)
+
+        if len(self._acc_ebuffer) >= 2:
+            _de = (self._acc_ebuffer[-1] - self._acc_ebuffer[-2]) / self.dt
+            _ie = sum(self._acc_ebuffer) * self.dt
         else:
             _de = 0.0
             _ie = 0.0
@@ -237,4 +273,49 @@ class Controller:
         control.hand_brake = False
         control.manual_gear_shift = False
         self.past_steering = steering
+        return control
+
+    def run_step(self, target_speed, waypoint, target_acceleration=None):
+        # control class for carla vehicle
+        control = carla.VehicleControl()
+
+        # emergency stop
+        if target_speed == 0 or waypoint is None:
+            control.steer = 0.0
+            control.throttle = 0.0
+            control.brake = 1.0
+            control.hand_brake = False
+            return control
+
+        if target_acceleration is not None:
+            acceleration = target_acceleration
+            # acceleration = self.acc_run_step(target_acceleration)
+        else:
+            acceleration = self.lon_run_step(target_speed)
+        current_steering = self.lat_run_step(waypoint)
+
+        if acceleration >= 0.0:
+            control.throttle = min(acceleration, self.max_throttle)
+            control.brake = 0.0
+        else:
+            control.throttle = 0.0
+            control.brake = min(abs(acceleration), self.max_brake)
+
+        # Steering regulation: changes cannot happen abruptly, can't steer too
+        # much.
+        if current_steering > self.past_steering + 0.2:
+            current_steering = self.past_steering + 0.2
+        elif current_steering < self.past_steering - 0.2:
+            current_steering = self.past_steering - 0.2
+
+        if current_steering >= 0:
+            steering = min(self.max_steering, current_steering)
+        else:
+            steering = max(-self.max_steering, current_steering)
+
+        control.steer = steering
+        control.hand_brake = False
+        control.manual_gear_shift = False
+        self.past_steering = steering
+        # print ('Control input: ', control)
         return control

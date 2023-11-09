@@ -55,7 +55,7 @@ class LDMentry:
 
 class Perception:
     def __init__(self, xPosition, yPosition, width, length, timestamp, confidence, xSpeed=0, ySpeed=0, heading=0,
-                 o3d_bbx=None, dxSpeed=0, dySpeed=0, fromID=None, ID=None):
+                 o3d_bbx=None, dxSpeed=0, dySpeed=0, fromID=None, ID=None, yaw = 0):
         self.id = ID
         self.xPosition = xPosition
         self.yPosition = yPosition
@@ -64,12 +64,15 @@ class Perception:
         self.xSpeed = xSpeed
         self.ySpeed = ySpeed
         self.speed = 0
-        self.heading = heading
+        self.heading = heading  # Heading value indicates the angle of speed vector
+        self.yaw = yaw  # Yaw value indicates the 'orientation' angle of the object
         self.timestamp = timestamp
         self.confidence = confidence
         self.min = None
         self.max = None
-        self.o3d_bbx = o3d_bbx
+        self.o3d_bbx = o3d_bbx  # Open3D axis alligned bounding box
+        self.line_set = None  # Open3D line set
+        self.o3d_obb = None  # Open3D oriented bounding box
         self.dxSpeed = dxSpeed
         self.dySpeed = dySpeed
         self.xacc = 0
@@ -110,3 +113,41 @@ class PLDMentry:
 
     def getOldestPoint(self):
         return self.pathHistory[0]
+
+
+def interpolate_color(color1, color2, ratio):
+    return [
+        int(color1[i] + (color2[i] - color1[i]) * ratio) for i in range(3)
+    ]
+
+
+class ColorGradient:
+    def __init__(self, steps):
+        self.steps = steps
+        self.gradient = self.generate_gradient()
+
+    def generate_gradient(self):
+        # Define the colors for green, yellow, and red
+        steps = self.steps
+        green = [0, 255, 0]
+        yellow = [255, 255, 0]
+        red = [255, 0, 0]
+
+        # Calculate the steps for each transition (half the total steps for green-to-yellow and yellow-to-red)
+        half_steps = steps // 2
+
+        gradient = []
+
+        # Generate the green-to-yellow portion of the gradient
+        for i in range(half_steps):
+            ratio = i / half_steps
+            color = interpolate_color(green, yellow, ratio)
+            gradient.append(color)
+
+        # Generate the yellow-to-red portion of the gradient
+        for i in range(half_steps, steps):
+            ratio = (i - half_steps) / half_steps
+            color = interpolate_color(yellow, red, ratio)
+            gradient.append(color)
+
+        return gradient

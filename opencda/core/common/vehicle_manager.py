@@ -7,7 +7,8 @@ Basic class of CAV
 import os, sys
 import importlib
 import uuid
-
+from opencda.customize.platooning.states import FSM
+from opencda.customize.platooning.states import I_FSM
 from opencda.core.actuation.control_manager \
     import ControlManager
 from opencda.core.application.platooning.platoon_behavior_agent \
@@ -24,6 +25,7 @@ from opencda.core.plan.behavior_agent \
 from opencda.core.map.map_manager import MapManager
 from opencda.core.common.data_dumper import DataDumper
 from opencda.customize.platooning.platooning_behavior_agent import PlatooningBehaviorAgentExtended
+from opencda.core.application.platooning.intruder_behavior_agent import IntruderBehaviorAgent
 from opencda.customize.msvan3t.msvan3t_agent import Msvan3tAgent
 
 
@@ -125,6 +127,15 @@ class VehicleManager(object):
                 behavior_config,
                 platoon_config,
                 carla_map)
+        elif 'intruder' in application:
+            platoon_config = config_yaml['platoon']
+            self.agent = IntruderBehaviorAgent(
+                vehicle,
+                self,
+                self.v2x_manager,
+                behavior_config,
+                platoon_config,
+                carla_map)
         else:
             self.agent = BehaviorAgent(vehicle, carla_map, behavior_config)
 
@@ -182,6 +193,7 @@ class VehicleManager(object):
 
         ego_pos = self.localizer.get_ego_pos()
         ego_spd = self.localizer.get_ego_spd()
+        ego_acc = self.localizer.get_ego_acc()
 
         # object detection
         objects = self.perception_manager.detect(ego_pos)
@@ -204,17 +216,29 @@ class VehicleManager(object):
 
         self.agent.update_information(ego_pos, ego_spd, objects)
         # pass position and speed info to controller
-        self.controller.update_info(ego_pos, ego_spd)
+        self.controller.update_info(ego_pos, ego_spd, ego_acc)
 
-    def run_step(self, target_speed=None):
+    def run_step(self, target_speed=None, target_acceleration=None):
         """
         Execute one step of navigation.
         """
         # visualize the bev map if needed
         self.map_manager.run_step()
 
-        target_speed, target_pos = self.agent.run_step(target_speed)
-        control = self.controller.run_step(target_speed, target_pos)
+        if isinstance(self.agent, PlatooningBehaviorAgentExtended):
+            if self.agent.v2xAgent.pcService.status in (FSM.MAINTINING, FSM.JOIN_RESPONSE, FSM.LEAVE_REQUEST):
+                target_acceleration, target_speed, target_pos = self.agent.run_step(target_speed)
+            else:
+                target_speed, target_pos = self.agent.run_step(target_speed)
+        elif isinstance(self.agent, IntruderBehaviorAgent):
+            if self.agent.v2xAgent.intruderApp.status == I_FSM.INTRUDING:
+                target_acceleration, target_speed, target_pos = self.agent.run_step(target_speed)
+            else:
+                target_speed, target_pos = self.agent.run_step(target_speed)
+        elif isinstance(self.agent, BehaviorAgent):
+            target_speed, target_pos = self.agent.run_step(target_speed)
+
+        control = self.controller.run_step(target_speed, target_pos, target_acceleration)
 
         # dump data
         if self.data_dumper:

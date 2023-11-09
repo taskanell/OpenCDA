@@ -238,7 +238,6 @@ class ScenarioManager:
         self.cav_world = cav_world
         self.carla_map = self.world.get_map()
         self.apply_ml = apply_ml
-
     @staticmethod
     def set_weather(weather_settings):
         """
@@ -324,16 +323,37 @@ class ScenarioManager:
                 spawn_transform = map_helper(self.carla_version,
                                              *cav_config['spawn_special'])
 
-            cav_vehicle_bp.set_attribute('color', '0, 0, 255')
-            vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+            if 'intruder' in cav_config['v2x']:
+                if cav_config['v2x']['intruder']:
+                    cav_vehicle_bp.set_attribute('color', '255, 0, 0')
+                    vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
 
-            # create vehicle manager for each cav
-            vehicle_manager = ExtendedVehicleManager(
-                vehicle, cav_config, application,
-                self.carla_map, self.cav_world,
-                current_time=self.scenario_params['current_time'],
-                data_dumping=data_dump,
-                pldm=pldm, log_dir=log_dir)
+                    vehicle_manager = ExtendedVehicleManager(
+                        vehicle, cav_config, 'intruder',
+                        self.carla_map, self.cav_world,
+                        current_time=self.scenario_params['current_time'],
+                        data_dumping=data_dump,
+                        pldm=False, log_dir=log_dir)
+                else:
+                    cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+                    vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+                    # create vehicle manager for each cav
+                    vehicle_manager = ExtendedVehicleManager(
+                        vehicle, cav_config, application,
+                        self.carla_map, self.cav_world,
+                        current_time=self.scenario_params['current_time'],
+                        data_dumping=data_dump,
+                        pldm=pldm, log_dir=log_dir)
+            else:
+                cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+                vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+                # create vehicle manager for each cav
+                vehicle_manager = ExtendedVehicleManager(
+                    vehicle, cav_config, application,
+                    self.carla_map, self.cav_world,
+                    current_time=self.scenario_params['current_time'],
+                    data_dumping=data_dump,
+                    pldm=pldm, log_dir=log_dir)
 
             self.world.tick()
 
@@ -410,7 +430,7 @@ class ScenarioManager:
             spawn_transform = map_helper(self.carla_version,
                                          *cav_config['spawn_special'])
 
-        cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+        cav_vehicle_bp.set_attribute('color', '0, 255, 0')
         vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
 
         # create vehicle manager for each cav
@@ -494,7 +514,7 @@ class ScenarioManager:
                     spawn_transform = map_helper(self.carla_version,
                                                  *cav['spawn_special'])
 
-                cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+                cav_vehicle_bp.set_attribute('color', '0, 255, 0')
                 vehicle = self.world.spawn_actor(cav_vehicle_bp,
                                                  spawn_transform)
 
@@ -582,7 +602,7 @@ class ScenarioManager:
             prob = [self.bp_class_sample_prob[itm] for itm in label_list]
 
         # if not random select, we always choose lincoln.mkz with green color
-        color = '0, 255, 0'
+        color = '128, 128, 128'
         default_model = 'vehicle.lincoln.mkz2017' \
             if self.carla_version == '0.9.11' else 'vehicle.lincoln.mkz_2017'
         ego_vehicle_bp = blueprint_library.find(default_model)
@@ -623,6 +643,7 @@ class ScenarioManager:
                 tm.vehicle_percentage_speed_difference(
                     vehicle, vehicle_config['vehicle_speed_perc'])
             tm.auto_lane_change(vehicle, traffic_config['auto_lane_change'])
+            tm.ignore_lights_percentage(vehicle, 0)
 
             bg_list.append(vehicle)
 
@@ -657,7 +678,7 @@ class ScenarioManager:
             prob = [self.bp_class_sample_prob[itm] for itm in label_list]
 
         # if not random select, we always choose lincoln.mkz with green color
-        color = '0, 255, 0'
+        color = '128, 128, 128'
         default_model = 'vehicle.lincoln.mkz2017' \
             if self.carla_version == '0.9.11' else 'vehicle.lincoln.mkz_2017'
         ego_vehicle_bp = blueprint_library.find(default_model)
