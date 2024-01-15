@@ -18,7 +18,7 @@ class CarlaAdapterStub(object):
         self.ExecuteOneTimeStep = channel.unary_unary(
                 '/carla.CarlaAdapter/ExecuteOneTimeStep',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                response_deserializer=carla__pb2.Boolean.FromString,
                 )
         self.Finish = channel.unary_unary(
                 '/carla.CarlaAdapter/Finish',
@@ -169,7 +169,7 @@ def add_CarlaAdapterServicer_to_server(servicer, server):
             'ExecuteOneTimeStep': grpc.unary_unary_rpc_method_handler(
                     servicer.ExecuteOneTimeStep,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                    response_serializer=carla__pb2.Boolean.SerializeToString,
             ),
             'Finish': grpc.unary_unary_rpc_method_handler(
                     servicer.Finish,
@@ -254,7 +254,7 @@ class CarlaAdapter(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/carla.CarlaAdapter/ExecuteOneTimeStep',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            carla__pb2.Boolean.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

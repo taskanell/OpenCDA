@@ -90,7 +90,7 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         self.step_event.clear()
         self.tick_event.set()
         self.steps += 1
-        return struct_pb2.Value()
+        return carla_pb2.Boolean(value=True)
 
     def GetManagedActorsIds(self, request, context):
         self.world.get_actors()

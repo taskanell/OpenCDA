@@ -112,7 +112,7 @@ class V2XAgent(object):
     """
 
     # def __init__(self, cav_world, vid, perceptionManager, localizer, carla_map, vehicle):
-    def __init__(self, cav, ldm_mutex, log_dir=None,rgb_send=True, lidar_send=True):
+    def __init__(self, cav, ldm_mutex, log_dir=None, PLDM=None, rgb_send=True, lidar_send=True):
 
         self.cav = cav
         self.log_dir = log_dir
