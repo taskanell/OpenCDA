@@ -197,3 +197,21 @@ class CPservice(object):
             t_fusion += time.time_ns() / 1000 - init_t
 
         return t_parse, t_fusion
+
+    def getStationType(self):
+        stationType = 5  # passengerCar
+        if self.cav.vehicle.attributes['number_of_wheels'] == 2:
+            if self.cav.vehicle.type_id.find('crossbike') != -1 or \
+                    self.cav.vehicle.type_id.find('gazelle') != -1 or \
+                    self.cav.vehicle.type_id.find('diamondback') != -1:
+                stationType = 2  # bicycle
+            else:
+                stationType = 4  # motorcycle
+        if self.cav.vehicle.type_id.find('firetruck') != -1 or \
+                self.cav.vehicle.type_id.find('police') != -1 or \
+                self.cav.vehicle.type_id.find('ambulance') != -1:
+            stationType = 10  # specialVehicle
+        if self.cav.vehicle.type_id.find('carlacola') != -1:
+            stationType = 7  # light truck
+
+        return stationType
