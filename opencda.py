@@ -33,20 +33,6 @@ def arg_parse():
     parser.add_argument('-v', "--version", type=str, default='0.9.11',
                         help='Specify the CARLA simulator version, default'
                              'is 0.9.11, 0.9.12 is also supported.')
-    parser.add_argument('-n', '--client_number', type=int, default=1,
-                        help='Specify the SUMO client number. Only to be used when multiple '
-                             'OpenCDA clients are needed.')
-    parser.add_argument('-s', '--sumo_clients', type=int, default=1,
-                        help='Specify the total number of SUMO clients to be launched. Only to be used when multiple '
-                             'SUMO clients are needed.')
-    parser.add_argument('-p', '--pldm', action='store_true',
-                        help='whether to activate the pldm service')
-    parser.add_argument('-x', '--xPos', type=float, default=0.0,
-                        help='Specify the x position of spawn point for single vehicle')
-    parser.add_argument('-y', '--yPos', type=float, default=0.0,
-                        help='Specify the y position of spawn point for single vehicle')
-    parser.add_argument('-z', '--pmNum', type=int, default=0,
-                        help='Specify the number of the platoon member')
     # parse the arguments and return the result
     opt = parser.parse_args()
     return opt

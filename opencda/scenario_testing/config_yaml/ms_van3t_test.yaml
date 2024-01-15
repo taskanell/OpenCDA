@@ -4,122 +4,130 @@ carla_traffic_manager:
   ignore_lights_percentage: 0
   vehicle_list:
   - spawn_position:
-    - -50.59
-    - -22.81
+    - 131.032
+    - 139.51
     - 0.3
     - 0
-    - 60
+    - 0
     - 0
     vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -50.59
-#    - -32.81
-#    - 0.3
-#    - 0
-#    - 90
-#    - 0
-#    vehicle_speed_perc: -200
   - spawn_position:
-    - -50.59
-    - -42.81
+    - 121.5344
+    - 143.51
     - 0.3
     - 0
-    - 120
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 111.0578
+    - 139.51
+    - 0.3
+    - 0
+    - 0
+    - 0
+    vehicle_speed_perc: -200
+  - spawn_position:
+    - 111.5083
+    - 146.51
+    - 0.3
+    - 0
+    - 0
     - 0
     vehicle_speed_perc: -200
 #  - spawn_position:
-#    - -50.59
-#    - -52.81
-#    - 0.3
-#    - 0
-#    - 90
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -50.59
-#    - -62.81
-#    - 0.3
-#    - 0
-#    - 90
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -54.59
-#    - -22.81
-#    - 0.3
-#    - 0
-#    - 90
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -50.59
-#    - 15
-#    - 0.3
-#    - 0
-#    - 90
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -54.59
-#    - 20
-#    - 0.3
-#    - 0
-#    - 90
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -54.59
-#    - 30
-#    - 0.3
-#    - 0
-#    - 90
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -54.59
-#    - 40
-#    - 0.3
-#    - 0
-#    - 90
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -50.59
-#    - 25
-#    - 0.3
-#    - 0
-#    - 90
-#    - 0
-#    vehicle_speed_perc: -200
-#
-#  - spawn_position:
-#    - -67.5
-#    - -6
+#    - 121.9651
+#    - 143.51
 #    - 0.3
 #    - 0
 #    - 0
 #    - 0
 #    vehicle_speed_perc: -200
 #  - spawn_position:
-#    - -77.5
-#    - -6
+#    - 116.9527
+#    - 149.51
 #    - 0.3
 #    - 0
 #    - 0
 #    - 0
 #    vehicle_speed_perc: -200
 #  - spawn_position:
-#    - -70.59
-#    - -2
+#    - 75.8542
+#    - 149.51
 #    - 0.3
 #    - 0
 #    - 0
 #    - 0
 #    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - 63.5643
+#    - 149.51
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - 135.0117
+#    - 136.51
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - 106.085
+#    - 149.51
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - 90.8226
+#    - 146.51
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - 103.559
+#    - 136.51
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - 152.2091
+#    - 143.51
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - 71.9302
+#    - 143.51
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - 83.2754
+#    - 136.51
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+
 vehicle_base:
   sensing:
     perception:
-      activate: false # when not activated, objects positions will be retrieved from server directly
+      activate: true # when not activated, objects positions will be retrieved from server directly
       camera:
         visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
         num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -152,16 +160,76 @@ vehicle_base:
 
 platoon_base:
   max_capacity: 10
-  inter_gap: 0.6 # desired time gap
-  open_gap: 1.2 # open gap
+  inter_gap: 0.2 # desired time gap
+  open_gap: 1.0 # open gap
   warm_up_speed: 30 # required speed before cooperative merging
 
 
 scenario:
   single_cav_list: # this is for merging vehicle or single cav without v2x
-#    - name: cav1
-#      spawn_position: [-54.59, -22.81, 0.60, 0, 90, 0]
-#      destination: [606.87, 146.39, 0]
+    - name: cav1
+      spawn_position: [121.7194, 139.51, 0.3, 0, 0, 0]
+      destination: [606.87, 145.39, 0]
+      sensing:
+        perception:
+          activate: true
+          camera:
+            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions:
+              - [2.5, 0, 1.0, 0]
+              - [0.0, 0.3, 1.8, 100]
+              - [0.0, -0.3, 1.8, -100]
+              - [-2.0, 0.0, 1.5, 180]
+          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+            visualize: true
+      v2x:
+        communication_range: 35
+        platoon_init_pos: 1
+        pldm: true
+      behavior:
+        <<: *base_behavior
+        max_speed: 70 # maximum speed, km/h
+        tailgate_speed: 111
+        overtake_allowed: false
+        local_planner:
+          debug_trajectory: true
+          debug: false
+
+    - name: cav2
+      spawn_position: [111.7194, 143.51, 0.3, 0, 0, 0]
+      destination: [606.87, 145.39, 0]
+      sensing:
+        perception:
+          activate: true
+          camera:
+            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions:
+              - [2.5, 0, 1.0, 0]
+              - [0.0, 0.3, 1.8, 100]
+              - [0.0, -0.3, 1.8, -100]
+              - [-2.0, 0.0, 1.5, 180]
+          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+            visualize: true
+      v2x:
+        communication_range: 35
+        platoon_init_pos: 2
+        pldm: true
+      behavior:
+        <<: *base_behavior
+        max_speed: 100 # maximum speed, km/h
+        tailgate_speed: 111
+        overtake_allowed: true
+        local_planner:
+          debug_trajectory: true
+          debug: false
+
+#    - name: cav3
+#      spawn_position: [101.7194, 139.51, 0.3, 0, 0, 0]
+#      destination: [606.87, 145.39, 0]
 #      sensing:
 #        perception:
 #          activate: false
@@ -178,76 +246,43 @@ scenario:
 #            visualize: true
 #      v2x:
 #        communication_range: 35
-#        platoon_init_pos: 1
+#        platoon_init_pos: 3
 #        pldm: true
-#        intruder: false
 #      behavior:
 #        <<: *base_behavior
-#        max_speed: 70 # maximum speed, km/h
+#        max_speed: 100 # maximum speed, km/h
 #        tailgate_speed: 111
-#        overtake_allowed: false
+#        overtake_allowed: true
 #        local_planner:
 #          debug_trajectory: true
 #          debug: false
-
-    - name: cav2
-      spawn_position: [-54.59, -32.81, 0.60, 0, 60, 0]
-      destination: [606.87, 143.39, 0]
-      sensing:
-        perception:
-          activate: false
-          camera:
-            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
-            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
-            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
-            positions:
-              - [2.5, 0, 1.0, 0]
-              - [0.0, 0.3, 1.8, 100]
-              - [0.0, -0.3, 1.8, -100]
-              - [-2.0, 0.0, 1.5, 180]
-          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-            visualize: true
-      v2x:
-        communication_range: 35
-        platoon_init_pos: 0
-        pldm: false
-        intruder: false
-      behavior:
-        <<: *base_behavior
-        max_speed: 100 # maximum speed, km/h
-        tailgate_speed: 111
-        overtake_allowed: true
-        local_planner:
-          debug_trajectory: true
-          debug: false
-
-    - name: cav3
-      spawn_position: [-54.59, -52.81, 0.60, 0, 90, 0]
-      destination: [606.87, 143.39, 0]
-      sensing:
-        perception:
-          activate: false
-          camera:
-            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
-            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
-            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
-            positions:
-              - [2.5, 0, 1.0, 0]
-              - [0.0, 0.3, 1.8, 100]
-              - [0.0, -0.3, 1.8, -100]
-              - [-2.0, 0.0, 1.5, 180]
-          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-            visualize: true
-      v2x:
-        communication_range: 35
-        platoon_init_pos: 3
-        pldm: true
-        intruder: false
-      behavior:
-        <<: *base_behavior
-        max_speed: 100 # maximum speed, km/h
-        tailgate_speed: 111
-        overtake_allowed: true
-        local_planner:
-          debug_trajectory: true
-          debug: false
+#
+#    - name: cav4
+#      spawn_position: [91.7194, 139.51, 0.3, 0, 0, 0]
+#      destination: [606.87, 145.39, 0]
+#      sensing:
+#        perception:
+#          activate: false
+#          camera:
+#            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+#            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+#            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+#            positions:
+#              - [2.5, 0, 1.0, 0]
+#              - [0.0, 0.3, 1.8, 100]
+#              - [0.0, -0.3, 1.8, -100]
+#              - [-2.0, 0.0, 1.5, 180]
+#          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+#            visualize: true
+#      v2x:
+#        communication_range: 35
+#        platoon_init_pos: 4
+#        pldm: true
+#      behavior:
+#        <<: *base_behavior
+#        max_speed: 100 # maximum speed, km/h
+#        tailgate_speed: 111
+#        overtake_allowed: true
+#        local_planner:
+#          debug_trajectory: true
+#          debug: false

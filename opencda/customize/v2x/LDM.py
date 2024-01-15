@@ -66,13 +66,17 @@ class LDM(object):
                     LDMpredX = LDMobj.perception.xPosition
                     LDMpredY = LDMobj.perception.yPosition
                     LDMpredbbx, LDMpredline_set = get_o3d_bbx(self.cav, LDMpredX, LDMpredY, LDMobj.perception.width,
-                                             LDMobj.perception.length, LDMobj.perception.yaw)
+                                                              LDMobj.perception.length, LDMobj.perception.yaw)
 
                     dist = math.sqrt(
                         math.pow((obj.xPosition - LDMpredX), 2) + math.pow(
                             (obj.yPosition - LDMpredY), 2))
                     iou = compute_IoU(LDMpredbbx, object_list[j].o3d_bbx)
-                    iou = compute_IoU_lineSet(LDMpredline_set, object_list[j].line_set)
+                    try:
+                        iou = compute_IoU_lineSet(LDMpredline_set, object_list[j].line_set)
+                    except RuntimeError as e:
+                        # print("Unable to compute the oriented bounding box:", e)
+                        pass
                     if iou > 0:
                         IoU_map[i, j] = iou
                     elif dist < 3:  # if dist < 3 --> IoU_map[i, j] = 0
@@ -159,7 +163,11 @@ class LDM(object):
     def LDM_to_lidarObjects(self):
         lidarObjects = []
         for ID, LDMobj in self.LDM.items():
-            lidarObjects.append(LDMobj)  # return last sample of each object in LDM
+            egoPos = self.cav.localizer.get_ego_pos()
+            dist = math.sqrt(math.pow((LDMobj.perception.xPosition - egoPos.location.x), 2) +
+                             math.pow((LDMobj.perception.yPosition - egoPos.location.y), 2))
+            if dist < 100:
+                lidarObjects.append(LDMobj)  # return last sample of each object in LDM
         return {'vehicles': lidarObjects}
 
     def clean_duplicates(self):
@@ -184,35 +192,32 @@ class LDM(object):
 
         self.LDM[id].onSight = True
         # Compute the estimated heading angle
-        obj.heading = math.degrees(math.atan2(obj.ySpeed, obj.xSpeed))
-
+        obj.heading = obj.yaw
         if self.LDM[id].detected is False:
             # If this entry is of a connected vehicle
             # obj.connected = True  # We do this to take the width and length from CAM always
             obj.width = self.LDM[id].perception.width
             obj.length = self.LDM[id].perception.length
+            obj.yaw = self.LDM[id].perception.yaw
+            obj.heading = self.LDM[id].perception.heading
         else:
             width_max = obj.width
             length_max = obj.length
             for prev_obj in self.LDM[id].pathHistory:
-                if prev_obj.width > width_max:
+                if prev_obj.width > width_max <= 2.1:
                     width_max = prev_obj.width
-                if length_max < prev_obj.length <= 2.1:
+                if length_max < prev_obj.length:
                     length_max = prev_obj.length
             obj.width = width_max
             obj.length = length_max
+            yaw_list = [obj.yaw]
+            for prev_obj in self.LDM[id].pathHistory:
+                yaw_list.append(prev_obj.yaw)
+            obj.yaw = np.mean(yaw_list)
 
         obj.o3d_bbx, obj.line_set = LDMobj_to_o3d_bbx(self.cav, obj)
 
-        # print('[LDM append] '+str(obj.id) + ' speed: ' + str(obj.xSpeed) + ',' + str(obj.ySpeed))
-
-        # x, y, vx, vy, ax, ay = self.LDM[id].kalman_filter.predict(self.cav.get_time_ms())
-
-        # print('LDM local update: ')
-        # print('KFpred: ', "x: ", x, ",y: ", y, ",vx: ", vx, ",vy: ", vy, ",ax: ", ax, ",ay: ", ay)
-        # print('Perception x: ',obj.xPosition, ",y: ", obj.yPosition, ",vx: ", obj.xSpeed, ",vy: ", obj.ySpeed)
         x, y, vx, vy, ax, ay = self.LDM[id].kalman_filter.update(obj.xPosition, obj.yPosition, self.cav.get_time_ms())
-        # print('KFupdate: ', "x: ", x, ",y: ", y, ",vx: ", vx, ",vy: ", vy, ",ax: ", ax, ",ay: ", ay)
         obj.xPosition = x
         obj.yPosition = y
         obj.xSpeed = vx
@@ -266,12 +271,12 @@ class LDM(object):
 
     def CAMfusion(self, CAMobject):
         CAMobject.connected = True
-        CAMobject.o3d_bbx = get_o3d_bbx(self.cav,
-                                        CAMobject.xPosition,
-                                        CAMobject.yPosition,
-                                        CAMobject.width,
-                                        CAMobject.length,
-                                        CAMobject.yaw)
+        CAMobject.o3d_bbx, CAMobject.line_set = get_o3d_bbx(self.cav,
+                                                            CAMobject.xPosition,
+                                                            CAMobject.yPosition,
+                                                            CAMobject.width,
+                                                            CAMobject.length,
+                                                            CAMobject.yaw)
         if CAMobject.id in self.LDM:
             # If this is not the first CAM
             self.LDM[CAMobject.id].kalman_filter.predict(self.cav.get_time_ms())
@@ -307,16 +312,18 @@ class LDM(object):
     def CPMfusion(self, object_list, fromID):
         ego_pos, ego_spd, objects = self.cav.getInfo()
         post_list = []
-        if fromID in self.recvCPMmap:
-            for PO in object_list:
-                if PO.id in self.recvCPMmap[fromID]:
-                    if self.recvCPMmap[fromID][PO.id] in self.LDM:
-                        self.append_CPM_object(PO, self.recvCPMmap[fromID][PO.id], fromID)
-                        continue
-                post_list.append(PO)
-        else:
-            self.recvCPMmap[fromID] = {}
-            post_list = object_list
+        post_list = object_list # TODO: solve ms-van3t api resulting in changing POids from same cav
+        # if fromID in self.recvCPMmap:
+        #     for PO in object_list:
+        #         if PO.id in self.recvCPMmap[fromID]:
+        #             if self.recvCPMmap[fromID][PO.id] in self.LDM:
+        #                 self.append_CPM_object(PO, self.recvCPMmap[fromID][PO.id], fromID)
+        #                 continue
+        #         post_list.append(PO)
+        # else:
+        #     self.recvCPMmap[fromID] = {}
+        #     post_list = object_list
+
         # Try to match CPM objects with LDM ones
         # If we match an object, we perform fusion averaging the bbx
         # If can't match the object we append it to the LDM as a new object
@@ -326,27 +333,27 @@ class LDM(object):
                 # If it's an old perception, we need to predict its current position
                 CPMobj.xPosition += CPMobj.xSpeed * diff + 0.5 * CPMobj.xacc * (diff ** 2)
                 CPMobj.yPosition += CPMobj.ySpeed * diff + 0.5 * CPMobj.yacc * (diff ** 2)
-                CPMobj.o3d_bbx = get_o3d_bbx(self.cav, CPMobj.xPosition,
-                                             CPMobj.yPosition,
-                                             CPMobj.width,
-                                             CPMobj.length,
-                                             CPMobj.yaw)
+                CPMobj.o3d_bbx, CPMobj.line_set = get_o3d_bbx(self.cav, CPMobj.xPosition,
+                                                              CPMobj.yPosition,
+                                                              CPMobj.width,
+                                                              CPMobj.length,
+                                                              CPMobj.yaw)
 
         IoU_map, new, matched, ldm_ids = self.match_LDM(post_list)
 
         for j in range(len(post_list)):
             CPMobj = post_list[j]
             # Compute bbx from cav's POV because we already converted values
-            CPMobj.o3d_bbx = get_o3d_bbx(self.cav, CPMobj.xPosition,
-                                         CPMobj.yPosition,
-                                         CPMobj.width,
-                                         CPMobj.length,
-                                         CPMobj.yaw)
+            CPMobj.o3d_bbx, CPMobj.line_set = get_o3d_bbx(self.cav, CPMobj.xPosition,
+                                                          CPMobj.yPosition,
+                                                          CPMobj.width,
+                                                          CPMobj.length,
+                                                          CPMobj.yaw)
             if IoU_map is not None:
                 matchedObj = matched[np.where(new == j)[0]]
                 if IoU_map[matchedObj, j] >= 0:
                     self.append_CPM_object(CPMobj, ldm_ids[matchedObj[0]], fromID)
-                    self.recvCPMmap[fromID][CPMobj.id] = ldm_ids[matchedObj[0]]
+                    # self.recvCPMmap[fromID][CPMobj.id] = ldm_ids[matchedObj[0]]
                     continue
             dist = math.sqrt(
                 math.pow((CPMobj.xPosition - ego_pos.location.x), 2) + math.pow(
@@ -363,7 +370,7 @@ class LDM(object):
                                                     CPMobj.ySpeed,
                                                     CPMobj.xacc,
                                                     CPMobj.yacc)
-            self.recvCPMmap[fromID][CPMobj.id] = newID
+            # self.recvCPMmap[fromID][CPMobj.id] = newID
 
     def append_CPM_object(self, CPMobj, id, fromID):
         if fromID not in self.LDM[id].perceivedBy:
@@ -377,12 +384,14 @@ class LDM(object):
                                CPMobj.length,
                                CPMobj.timestamp,
                                CPMobj.confidence)
+        newLDMobj.yaw = CPMobj.yaw
+        newLDMobj.heading = CPMobj.heading
         # If the object is also perceived locally
         if self.cav.vehicle.id in self.LDM[id].perceivedBy and self.LDM[id].onSight:
             # Compute weights depending on the POage and confidence (~distance from detecting vehicle)
             LDMobj = self.LDM[id].perception
-            LDMobj_age = LDMobj.timestamp - self.cav.get_time()
-            CPMobj_age = CPMobj.timestamp - self.cav.get_time()
+            LDMobj_age = 100 - (self.cav.get_time() - LDMobj.timestamp)
+            CPMobj_age = 100 - (self.cav.get_time() - CPMobj.timestamp)
             if (LDMobj.confidence == 0 and CPMobj.confidence == 0) or \
                     (LDMobj_age == 0 and CPMobj_age == 0):
                 weightCPM = 0.5
@@ -405,6 +414,7 @@ class LDM(object):
             newLDMobj.width = (CPMobj.width * weightCPM + LDMobj.width * weightLDM) / (weightLDM + weightCPM)
             newLDMobj.length = (CPMobj.length * weightCPM + LDMobj.length * weightLDM) / (weightLDM + weightCPM)
             newLDMobj.heading = (CPMobj.heading * weightCPM + LDMobj.heading * weightLDM) / (weightLDM + weightCPM)
+            newLDMobj.yaw = (CPMobj.yaw * weightCPM + LDMobj.yaw * weightLDM) / (weightLDM + weightCPM)
             # newLDMobj.confidence = (CPMobj.confidence + LDMobj.confidence) / 2
             newLDMobj.timestamp = self.cav.get_time()
             # self.LDM[id].onSight = True
@@ -421,14 +431,15 @@ class LDM(object):
         newLDMobj.xacc = ax
         newLDMobj.yacc = ay
 
-        newLDMobj.o3d_bbx = get_o3d_bbx(self.cav,
-                                        newLDMobj.xPosition,
-                                        newLDMobj.yPosition,
-                                        newLDMobj.width,
-                                        newLDMobj.length,
-                                        newLDMobj.yaw)
+        newLDMobj.o3d_bbx, newLDMobj.line_set = get_o3d_bbx(self.cav,
+                                                            newLDMobj.xPosition,
+                                                            newLDMobj.yPosition,
+                                                            newLDMobj.width,
+                                                            newLDMobj.length,
+                                                            newLDMobj.yaw)
         # cav.LDM[id].kalman_filter.update(newLDMobj.xPosition, newLDMobj.yPosition, newLDMobj.width, newLDMobj.length)
         self.LDM[id].insertPerception(newLDMobj)
+        # self.LDM[id].CPM = True
 
     def getLDM_tracked(self):
         tracked = {}

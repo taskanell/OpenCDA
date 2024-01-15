@@ -1,8 +1,126 @@
+carla_traffic_manager:
+  global_distance: 4.0
+  global_speed_perc: -50
+  ignore_lights_percentage: 0
+  vehicle_list:
+  - spawn_position:
+    - -50.59
+    - -22.81
+    - 0.3
+    - 0
+    - 60
+    - 0
+    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -50.59
+#    - -32.81
+#    - 0.3
+#    - 0
+#    - 90
+#    - 0
+#    vehicle_speed_perc: -200
+  - spawn_position:
+    - -50.59
+    - -42.81
+    - 0.3
+    - 0
+    - 120
+    - 0
+    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -50.59
+#    - -52.81
+#    - 0.3
+#    - 0
+#    - 90
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -50.59
+#    - -62.81
+#    - 0.3
+#    - 0
+#    - 90
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -54.59
+#    - -22.81
+#    - 0.3
+#    - 0
+#    - 90
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -50.59
+#    - 15
+#    - 0.3
+#    - 0
+#    - 90
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -54.59
+#    - 20
+#    - 0.3
+#    - 0
+#    - 90
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -54.59
+#    - 30
+#    - 0.3
+#    - 0
+#    - 90
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -54.59
+#    - 40
+#    - 0.3
+#    - 0
+#    - 90
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -50.59
+#    - 25
+#    - 0.3
+#    - 0
+#    - 90
+#    - 0
+#    vehicle_speed_perc: -200
+#
+#  - spawn_position:
+#    - -67.5
+#    - -6
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -77.5
+#    - -6
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
+#  - spawn_position:
+#    - -70.59
+#    - -2
+#    - 0.3
+#    - 0
+#    - 0
+#    - 0
+#    vehicle_speed_perc: -200
 # First define the basic parameters of the vehicles
 vehicle_base:
   sensing:
     perception:
-      activate: false # when not activated, objects positions will be retrieved from server directly
+      activate: true # when not activated, objects positions will be retrieved from server directly
       camera:
         visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
         num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -54,18 +172,18 @@ scenario:
           debug: false
       v2x:
         ms-van3t: true
-    - name: cav2
-      spawn_position: [-54.59, -32.81, 0.60, 0, 60, 0]
-      # this parameter will overwrite the spawn position, when it is set, the vehicle is spawn
-      # at the merging lane. 0.5 means it is spawn at the middle of the whole merging lange.
-      # spawn_special: [0.34]
-      destination: [24.54, 161.94, 0.3]
-      behavior:
-        local_planner:
-          debug_trajectory: false
-          debug: false
-      v2x:
-        ms-van3t: true
+#    - name: cav2
+#      spawn_position: [-54.59, -32.81, 0.60, 0, 60, 0]
+#      # this parameter will overwrite the spawn position, when it is set, the vehicle is spawn
+#      # at the merging lane. 0.5 means it is spawn at the middle of the whole merging lange.
+#      # spawn_special: [0.34]
+#      destination: [24.54, 161.94, 0.3]
+#      behavior:
+#        local_planner:
+#          debug_trajectory: false
+#          debug: false
+#      v2x:
+#        ms-van3t: true
     - name: cav3
       spawn_position: [-54.59, -42.81, 0.60, 0, 60, 0]
       # this parameter will overwrite the spawn position, when it is set, the vehicle is spawn

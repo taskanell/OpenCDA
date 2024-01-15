@@ -127,8 +127,19 @@ def compute_IoU_lineSet(set1, set2):
     intersection_max = np.minimum(set1.get_max_bound(), set2.get_max_bound())
     intersection_size = np.maximum(0, intersection_max - intersection_min)
 
-    volume_box1 = np.prod(set1.get_oriented_bounding_box().extent)
-    volume_box2 = np.prod(set2.get_oriented_bounding_box().extent)
+    points1 = np.asarray(set1.points)
+    points2 = np.asarray(set2.points)
+    length1 = np.linalg.norm(points1[0] - points1[1])
+    length2 = np.linalg.norm(points2[0] - points2[1])
+    width1 = np.linalg.norm(points1[1] - points1[2])
+    width2 = np.linalg.norm(points2[1] - points2[2])
+    height1 = np.linalg.norm(points1[2] - points1[4])
+    height2 = np.linalg.norm(points2[2] - points2[4])
+
+    volume_box1 = length1 * width1 * height1
+    volume_box2 = length2 * width2 * height2
+    # volume_box1 = np.prod(set1.get_oriented_bounding_box().extent)
+    # volume_box2 = np.prod(set2.get_oriented_bounding_box().extent)
 
     volume_intersection = np.prod(intersection_size)
     volume_union = volume_box1 + volume_box2 - volume_intersection
@@ -200,7 +211,7 @@ def LDMobj_to_o3d_bbx(cav, LDMobj):
     lidarPos = cav.perception_manager.lidar.sensor.get_transform()
     translation = [LDMobj.xPosition, LDMobj.yPosition, lidarPos.location.z + 1.5]
     h, l, w = 1.5, LDMobj.length, LDMobj.width
-    rotation = np.deg2rad(90 + LDMobj.yaw)
+    rotation = np.deg2rad(LDMobj.yaw)
 
     # Create a bounding box outline
     bounding_box = np.array([
@@ -322,7 +333,8 @@ def get_o3d_bbx(cav, x, y, xe, ye, heading):
 
     translation = [x, y, lidarPos.location.z + 1.5]
     h, l, w = 1.5, ye, xe
-    rotation = np.deg2rad(90 + heading)
+    rotation = np.deg2rad(heading)
+
     # Create a bounding box outline
     bounding_box = np.array([
         [-l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2],

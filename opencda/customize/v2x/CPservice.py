@@ -25,7 +25,6 @@ class CPservice(object):
         self.minHeadingChangeThreshold = 4.0  # degrees
 
     def checkCPMconditions(self):
-        # TODO: implement the correct redundancy mitigation algorithm
         CPM = {}
         if (self.cav.time * 1000) - self.last_cpm > 100:
             if self.cav.pldm and self.cav.PLDM is not None:
@@ -96,7 +95,7 @@ class CPservice(object):
 
             # For debugging
             POs.append({'ObjectID': int(LDMobj.id),
-                        'Heading': int(heading * 10),  # In degrees/10
+                        'Heading': int(LDMobj.perception.heading * 10),  # In degrees/10
                         'Yaw': int(LDMobj.perception.yaw * 10),  # In degrees/10
                         'xSpeed': int(LDMobj.perception.xSpeed * 100),  # Centimeters per second
                         'ySpeed': int(LDMobj.perception.ySpeed * 100),  # Centimeters per second
@@ -108,6 +107,7 @@ class CPservice(object):
                         'yDistance': int(dy * 100),  # Centimeters
                         'confidence': int((100 - dist) if dist < 100 else 0),
                         'timestamp': int(LDMobj.getLatestPoint().timestamp * 1000)})
+            print('Vehicle '+str(self.cav.vehicle.id) +' [CPM] ' + str(LDMobj.id) + ' heading: ' + str(LDMobj.perception.heading) + ',' + str(LDMobj.perception.yaw))
             nPOs = nPOs + 1
             if self.cav.pldm and self.cav.PLDM is not None:
                 self.cav.PLDM.PLDM[LDMobj.id].CPM_lastIncluded = LDMobj.perception
@@ -127,11 +127,14 @@ class CPservice(object):
             'heading': int(ego_pos.rotation.yaw * 10),  # In degrees/10
             'speed': int(ego_spd * 100),  # Centimeters per second
             'vehicleLength': int(self.cav.vehicle.bounding_box.extent.x * 20),  # Centimeters
-            'vehicleWidth': int(self.cav.vehicle.bounding_box.extent.y * 20)  # Centimeters
+            'vehicleWidth': int(self.cav.vehicle.bounding_box.extent.y * 20) if self.cav.vehicle.bounding_box.extent.y > 0 else 1,
+            'acceleration': int(self.cav.localizer.get_ego_acc() * 10) if abs(self.cav.localizer.get_ego_acc() * 10) < 160 else 161,
         }
 
         CPM = {'type': 'CPM',
                'stationID': self.cav.vehicle.id,
+               'timestamp': int((self.cav.time * 1000)) % 65536,
+               'stationType': self.getStationType(),
                'numberOfPOs': nPOs,
                'perceivedObjects': POs,
                'referencePosition': referencePosition,
@@ -181,14 +184,12 @@ class CPservice(object):
                 newPO.ySpeed = float(CPMobj['ySpeed']) / 100
                 newPO.xacc = float(CPMobj['xAcceleration']) / 100
                 newPO.yacc = float(CPMobj['yAcceleration']) / 100
-                # print('[CPM] ' + str(newPO.id) + ' speed: ' + str(newPO.xSpeed) + ',' + str(newPO.ySpeed))
-                newPO.heading = math.degrees(float(CPMobj['Heading']) / 10)
-                newPO.yaw = math.degrees(float(CPMobj['Yaw']) / 10)
+                newPO.heading = float(CPMobj['Heading']) / 10
+                newPO.yaw = float(CPMobj['Heading']) / 10
                 newPOs.append(newPO)
             t_parse += time.time_ns() / 1000 - init_t
             init_t = time.time_ns() / 1000
-            # if CPM['stationID'] in self.recvCPMmap: print("Vehicle ", self.cav.vehicle.id, ":\n"," Previous: ",
-            # [x.id for x in self.recvCPMmap[CPM['stationID']]], "\n New: ", [x.id for x in newPOs])
+
             self.recvCPMmap[CPM['stationID']] = newPOs
             self.cav.ldm_mutex.acquire()
             self.cav.LDM.CPMfusion(newPOs, CPM['stationID'])

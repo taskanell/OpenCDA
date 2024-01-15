@@ -157,8 +157,12 @@ def o3d_visualizer_show(vis, count, point_cloud, objects, LDM=False):
                 vis.add_geometry(geometry)
                 LDM_geometries.append(geometry)
             else:
-                aabb = object_.o3d_bbx
-                vis.add_geometry(aabb)
+                if object_.o3d_obb is not None:
+                    object_.o3d_obb.color = (1, 0, 0)
+                    vis.add_geometry(object_.o3d_obb)
+                else:
+                    aabb = object_.o3d_bbx
+                    vis.add_geometry(aabb)
 
     min = np.array([1, 1, 1])
     max = np.array([2, 2, 2])
@@ -172,8 +176,11 @@ def o3d_visualizer_show(vis, count, point_cloud, objects, LDM=False):
         if key != 'vehicles':
             continue
         for object_ in object_list:
-            aabb = object_.o3d_bbx
-            vis.remove_geometry(aabb)
+            if object_.o3d_obb is not None:
+                vis.remove_geometry(object_.o3d_obb)
+            else:
+                aabb = object_.o3d_bbx
+                vis.remove_geometry(aabb)
 
     for geometry in LDM_geometries:
         vis.remove_geometry(geometry)
@@ -220,13 +227,17 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
                 if not object_.tracked:
                     continue
                 if object_.detected and object_.onSight:
-                    colors = [[1, 0, 0] for _ in range(12)]
-                    geometry.colors = o3d.utility.Vector3dVector(colors)
+                    if object_.CPM:
+                        colors = [[1, 0.6, 0] for _ in range(12)]
+                        geometry.colors = o3d.utility.Vector3dVector(colors)
+                    else:
+                        colors = [[1, 0, 0] for _ in range(12)]
+                        geometry.colors = o3d.utility.Vector3dVector(colors)
                 elif not object_.detected:
                     colors = [[0, 1, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
                 elif object_.CPM:
-                    colors = [[0.7, 0, 0] for _ in range(12)]
+                    colors = [[1, 1, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
                 elif isinstance(object_, PLDMentry) and object_.assignedPM is not None:
                     colors = [[1, 0, 0] for _ in range(12)]
@@ -430,6 +441,8 @@ def o3d_camera_lidar_fusion(objects,
             obstacle_vehicle = ObstacleVehicle(corner, aabb, confidence=confidence)
             if obb is not None:
                 obstacle_vehicle.o3d_obb = obb
+                obstacle_vehicle.bounding_box.extent.x = obb.extent[0]/2
+                obstacle_vehicle.bounding_box.extent.y = obb.extent[1]/2
                 yaw = ego_pos.rotation.yaw - np.degrees(np.arctan2(np.array(obb.R)[1, 0], np.array(obb.R)[0, 0]))
                 obstacle_vehicle.yaw = yaw
             if 'vehicles' in objects:

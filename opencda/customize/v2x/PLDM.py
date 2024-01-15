@@ -64,8 +64,8 @@ class PLDM(object):
                     # if self.cav.time > PLDMobj.perception.timestamp:
                     #     LDMpredX += (self.cav.time - PLDMobj.perception.timestamp) * PLDMobj.perception.xSpeed
                     #     LDMpredY += (self.cav.time - PLDMobj.perception.timestamp) * PLDMobj.perception.ySpeed
-                    LDMpredbbx = get_o3d_bbx(self.cav, LDMpredX, LDMpredY, PLDMobj.perception.width,
-                                             PLDMobj.perception.length)
+                    LDMpredbbx, LDMpredline_set = get_o3d_bbx(self.cav, LDMpredX, LDMpredY, PLDMobj.perception.width,
+                                                              PLDMobj.perception.length, PLDMobj.perception.yaw)
 
                     dist = math.sqrt(
                         math.pow((obj.xPosition - LDMpredX), 2) + math.pow(
@@ -94,7 +94,7 @@ class PLDM(object):
                 PLDMobj.perception.ySpeed, \
                 PLDMobj.perception.xacc, \
                 PLDMobj.perception.yacc = self.PLDM[ID].kalman_filter.predict(self.cav.get_time_ms())
-            PLDMobj.perception.o3d_bbx = self.cav.LDMobj_to_o3d_bbx(PLDMobj.perception)
+            PLDMobj.perception.o3d_bbx, PLDMobj.perception.line_set = self.cav.LDMobj_to_o3d_bbx(PLDMobj.perception)
             PLDMobj.perception.timestamp = self.cav.time
 
         IoU_map, new, matched, pldm_ids = self.match_PLDM(object_list['vehicles'])
@@ -216,7 +216,7 @@ class PLDM(object):
             obj.width = width_max
             obj.length = length_max
 
-        obj.o3d_bbx = LDMobj_to_o3d_bbx(self.cav, obj)
+        obj.o3d_bbx, obj.line_set = LDMobj_to_o3d_bbx(self.cav, obj)
 
         x, y, vx, vy, ax, ay = self.PLDM[id].kalman_filter.update(obj.xPosition, obj.yPosition, self.cav.get_time_ms())
         # print('KFupdate: ', "x: ", x, ",y: ", y, ",vx: ", vx, ",vy: ", vy, ",ax: ", ax, ",ay: ", ay)

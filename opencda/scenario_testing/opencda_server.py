@@ -12,7 +12,6 @@ from opencda.core.common.cav_world import CavWorld
 from opencda.scenario_testing.evaluations.evaluate_manager import \
     EvaluationManager
 from opencda.scenario_testing.utils.yaml_utils import add_current_time
-from opencda.customize.msvan3t.msvan3t_agent import Msvan3tAgent
 
 import time
 

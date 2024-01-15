@@ -30,6 +30,11 @@ class CarlaAdapterStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=carla__pb2.ActorIds.FromString,
                 )
+        self.GetManagedCAVsIds = channel.unary_unary(
+                '/carla.CarlaAdapter/GetManagedCAVsIds',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=carla__pb2.ActorIds.FromString,
+                )
         self.GetManagedActorById = channel.unary_unary(
                 '/carla.CarlaAdapter/GetManagedActorById',
                 request_serializer=carla__pb2.Number.SerializeToString,
@@ -70,6 +75,11 @@ class CarlaAdapterStub(object):
                 request_serializer=carla__pb2.Number.SerializeToString,
                 response_deserializer=carla__pb2.Boolean.FromString,
                 )
+        self.SetControl = channel.unary_unary(
+                '/carla.CarlaAdapter/SetControl',
+                request_serializer=carla__pb2.Control.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                )
 
 
 class CarlaAdapterServicer(object):
@@ -88,6 +98,12 @@ class CarlaAdapterServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetManagedActorsIds(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetManagedCAVsIds(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -141,6 +157,12 @@ class CarlaAdapterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetControl(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_CarlaAdapterServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -156,6 +178,11 @@ def add_CarlaAdapterServicer_to_server(servicer, server):
             ),
             'GetManagedActorsIds': grpc.unary_unary_rpc_method_handler(
                     servicer.GetManagedActorsIds,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=carla__pb2.ActorIds.SerializeToString,
+            ),
+            'GetManagedCAVsIds': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetManagedCAVsIds,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=carla__pb2.ActorIds.SerializeToString,
             ),
@@ -198,6 +225,11 @@ def add_CarlaAdapterServicer_to_server(servicer, server):
                     servicer.hasLDM,
                     request_deserializer=carla__pb2.Number.FromString,
                     response_serializer=carla__pb2.Boolean.SerializeToString,
+            ),
+            'SetControl': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetControl,
+                    request_deserializer=carla__pb2.Control.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -255,6 +287,23 @@ class CarlaAdapter(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/carla.CarlaAdapter/GetManagedActorsIds',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            carla__pb2.ActorIds.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetManagedCAVsIds(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/carla.CarlaAdapter/GetManagedCAVsIds',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             carla__pb2.ActorIds.FromString,
             options, channel_credentials,
@@ -393,5 +442,22 @@ class CarlaAdapter(object):
         return grpc.experimental.unary_unary(request, target, '/carla.CarlaAdapter/hasLDM',
             carla__pb2.Number.SerializeToString,
             carla__pb2.Boolean.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SetControl(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/carla.CarlaAdapter/SetControl',
+            carla__pb2.Control.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

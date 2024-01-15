@@ -12,16 +12,18 @@ from opencda.scenario_testing.utils.yaml_utils import add_current_time
 from threading import Event
 from opencda.scenario_testing.utils.ms_van3t_cosim_api import MsVan3tCoScenarioManager
 
+
 def run_scenario(opt, scenario_params):
     try:
         scenario_params = add_current_time(scenario_params)
 
         cav_world = CavWorld(opt.apply_ml)
 
+        # create co-simulation scenario manager
         scenario_manager = sim_api.ScenarioManager(scenario_params,
                                                    opt.apply_ml,
                                                    opt.version,
-                                                   town='Town05',
+                                                   town='Town04',
                                                    cav_world=cav_world)
 
         single_cav_list = \
@@ -38,27 +40,25 @@ def run_scenario(opt, scenario_params):
                                      traffic_manager,
                                      step_event)
 
-        # spectator = scenario_manager.world.get_spectator()
-        # spectator.set_transform(carla.Transform(carla.Location(0, 0, 20),
-        #                                         carla.Rotation(pitch=-90)))
         spectator = scenario_manager.world.get_spectator()
         spectator_vehicle = single_cav_list[1].vehicle
         transform = spectator_vehicle.get_transform()
         spectator.set_transform(carla.Transform(transform.location +
-                                                carla.Location(z=20),
+                                                carla.Location(z=60),
                                                 carla.Rotation(pitch=-90)))
         scenario_manager.tick()
+
         while True:
 
             transform = spectator_vehicle.get_transform()
             spectator.set_transform(carla.Transform(transform.location +
-                                                    carla.Location(z=50),
+                                                    carla.Location(z=60),
                                                     carla.Rotation(pitch=-90)))
 
             for i, single_cav in enumerate(single_cav_list):
                 single_cav.update_info_LDM()
-                control = single_cav.run_step()
-                single_cav.vehicle.apply_control(control)
+                # control = single_cav.run_step()
+                # single_cav.vehicle.apply_control(control)
 
             step_event.set()
             ms_van3t_manager.carla_object.tick_event.wait()

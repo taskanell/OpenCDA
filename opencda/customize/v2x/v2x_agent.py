@@ -13,7 +13,6 @@ from opencda.customize.v2x.CPservice import CPservice
 from opencda.customize.v2x.PCservice import PCservice
 from opencda.customize.v2x.PLDMservice import PLDMservice
 from opencda.customize.v2x.intruderApp import IntruderApp
-from proton.reactor import AtMostOnce
 
 import os, sys, math
 import time
@@ -23,102 +22,12 @@ import zmq
 import json
 from threading import Thread
 from threading import Event
-from proton import Message, Url
-from proton.handlers import MessagingHandler
-from proton.reactor import Container
 # from opencda.customize.core.common.vehicle_manager import LDMObject
 from opencda.co_simulation.sumo_integration.bridge_helper import BridgeHelper
 import traci  # pylint: disable=import-error
 import csv
 import time
 import psutil
-
-
-class Client(MessagingHandler):
-    def __init__(self, url, agent):
-        super(Client, self).__init__()
-        self.url = url
-        self.address = "topic://opencda"
-        self.agent = agent
-        self.run = True
-        self.ready = False
-        # self.id = agent.vehicle.id
-
-    def on_start(self, event):
-        self.conn = event.container.connect(self.url)
-        self.sender = event.container.create_sender(self.conn, self.address)
-        self.receiver = event.container.create_receiver(self.conn, self.address)
-
-    def cam_sender(self, cam):
-        message = Message(body=cam)
-        message.properties = {'ETSItype': 'CAM', 'ID': cam['stationID']}
-
-        time.sleep(float(random.randint(0, 50)) / 1000)  # To avoid sync
-        self.sender.send(message)
-
-    def cpm_sender(self, cpm):
-        message = Message(body=cpm)
-        message.properties = {'ETSItype': 'CPM', 'ID': cpm['stationID']}
-
-        time.sleep(float(random.randint(0, 50)) / 1000)  # To avoid sync
-        self.sender.send(message)
-        # print('Sent ', message.body)
-
-    def platoonControl_sender(self, msg):
-        message = Message(body=msg)
-        message.properties = {'ETSItype': msg['type'], 'ID': msg['stationID']}
-
-        time.sleep(float(random.randint(0, 50)) / 1000)  # To avoid sync
-        self.sender.send(message)
-
-    def on_link_opened(self, event):
-        self.ready = True
-
-    def on_message(self, event):
-        # kind of BTP implementation
-        file_t = time.time_ns() / 1000
-        if event.message.properties['ID'] != self.agent.cav.vehicle.id:
-            if self.agent.PLDM:
-                # print(event.message.properties['ETSItype'])
-                if event.message.properties['ETSItype'] == 'PMU' and self.agent.pldmService.leader:
-                    new_t, assigned_t = self.agent.pldmService.processPMU(event.message.body)
-                    writeLog(self.agent, 'PMU', file_t,
-                             len(event.message.body['assignedPOs']) + len(event.message.body['newPOs']),
-                             len(self.agent.cav.PLDM.PLDM),
-                             PMUnew=new_t,
-                             PMUassigned=assigned_t)
-                if event.message.properties['ETSItype'] == 'PLU':
-                    t_update, t_new, t_genPMU = self.agent.pldmService.processPLU(event.message.body)
-                    writeLog(self.agent, 'PLU', file_t, len(event.message.body['perceivedObjects']),
-                             len(self.agent.cav.PLDM.PLDM),
-                             PLUupdate=t_update,
-                             PLUnew=t_new,
-                             PLUgenPMU=t_genPMU)
-                if event.message.properties['ETSItype'] == 'CPM':
-                    t_parse, t_fusion = self.agent.pldmService.processCPM(event.message.body)
-                    writeLog(self.agent, 'CPM', file_t, len(event.message.body['perceivedObjects']),
-                             len(self.agent.cav.PLDM.PLDM),
-                             CPMparse=t_parse,
-                             CPMfusion=t_fusion)
-                    return
-                if event.message.properties['ETSItype'] == 'CAM':
-                    self.agent.pldmService.processCAM(event.message.body)
-                    writeLog(self.agent, 'CAM', file_t, 1, len(self.agent.cav.PLDM.PLDM))
-                    return
-            if event.message.properties['ETSItype'] == 'CAM':
-                self.agent.caService.processCAM(event.message.body)
-                writeLog(self.agent, 'CAM', file_t, 1, self.agent.cav.LDM.get_LDM_size())
-            if event.message.properties['ETSItype'] == 'CPM':
-                t_parse, t_fusion = self.agent.cpService.processCPM(event.message.body)
-                writeLog(self.agent, 'CPM', file_t, len(event.message.body['perceivedObjects']),
-                         self.agent.cav.LDM.get_LDM_size(),
-                         CPMparse=t_parse,
-                         CPMfusion=t_fusion)
-            if event.message.properties['ETSItype'] == 'PCM':
-                self.agent.pcService.processPCM(event.message.body)
-            if event.message.properties['ETSItype'] == 'PMM':
-                self.agent.pcService.processPMM(event.message.body)
-
 
 def writeLog(agent, message, timestamp, detected, tracked, PLUupdate=0, PLUnew=0,
              PLUgenPMU=0, PMUassigned=0, PMUnew=0, CPMparse=0, CPMfusion=0):
@@ -203,22 +112,15 @@ class V2XAgent(object):
     """
 
     # def __init__(self, cav_world, vid, perceptionManager, localizer, carla_map, vehicle):
-    def __init__(self, cav, ldm_mutex,
-                 AMQPbroker="127.0.0.1:5672", log_dir=None, PLDM=False):
+    def __init__(self, cav, ldm_mutex, log_dir=None,rgb_send=True, lidar_send=True):
 
         self.cav = cav
         self.log_dir = log_dir
         self.time = 0
-
-        self.AMQPbroker = AMQPbroker
-
-        # self.AMQPhandler = Client(self.AMQPbroker, self)
+        self.PLDM = False
+        self.file = False
 
         self.ldm_mutex = ldm_mutex
-
-        # self.amqp_t = Thread(target=self.amqp_thread)
-        # self.amqp_t.daemon = True
-        # self.amqp_t.start()
         self.process = psutil.Process(os.getpid())
 
         # ZMQ APPROACH
@@ -243,9 +145,6 @@ class V2XAgent(object):
         self.pcService = None
         if self.cav.platooning:
             self.pcService = PCservice(cav, self)
-        self.intruderApp = None
-        if self.cav.intruder:
-            self.intruderApp = IntruderApp(cav, self)
 
         self.PLDM = PLDM
         if self.PLDM:
@@ -282,31 +181,20 @@ class V2XAgent(object):
                                  psutil.virtual_memory().percent])
             time.sleep(0.5)
 
-    def amqp_thread(self):
-        Container(self.AMQPhandler).run()
 
     def tick(self):
         self.time = self.cav.time
         if self.PLDM:
             self.pldmService.runStep()
         # TODO: put both CA and CP services in a separate thread so they don't slow down the simulation
-        if self.caService.checkCAMconditions() and self.intruderApp is None:
-            # self.AMQPhandler.cam_sender(self.caService.generateCAM())
+        if self.caService.checkCAMconditions():
             self.send_buffer.append(self.caService.generateCAM())
             self.send_event.set()
-        CPM = False
-        if not self.PLDM:
-            CPM = self.cpService.checkCPMconditions()
-        # elif (self.cav.time * 1000) - self.cpService.last_cpm > 100:
-        #     CPM = self.pldmService.pldm.getCPM()
-        if CPM is not False and self.intruderApp is None:
-            # self.AMQPhandler.cpm_sender(self.cpService.generateCPM())
+
+        CPM = self.cpService.checkCPMconditions()
+        if CPM is not False:
             self.send_buffer.append(self.cpService.generateCPM(CPM))
             self.send_event.set()
         # run platooning step after some time (needed to populate LDM)
         if self.pcService is not None and self.time > 1:
             self.pcService.run_step()
-            print('[Vehicle ', self.cav.vehicle.id, ']: ', self.pcService.status)
-        if self.intruderApp is not None:
-            self.intruderApp.run_step()
-            print('[Vehicle ', self.cav.vehicle.id, ']: ', self.intruderApp.status)

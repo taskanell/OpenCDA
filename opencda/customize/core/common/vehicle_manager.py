@@ -139,8 +139,6 @@ class ExtendedVehicleManager(VehicleManager):
         if self.ms_vanet_agent is None:
             self.v2xAgent = V2XAgent(self,
                                      ldm_mutex=self.ldm_mutex,
-                                     AMQPbroker="127.0.0.1:5672",
-                                     PLDM=pldm,
                                      log_dir=self.log_dir)
             self.agent.v2xAgent = weakref.ref(self.v2xAgent)()
 
@@ -258,8 +256,8 @@ class ExtendedVehicleManager(VehicleManager):
             # print("Carla yaw: ", yaw, " Opencda yaw: ", obj.yaw)
             LDMobj = Perception(obj.location.x,
                                 obj.location.y,
-                                obj.bounding_box.extent.x * 2,
                                 obj.bounding_box.extent.y * 2,
+                                obj.bounding_box.extent.x * 2,
                                 self.time,
                                 obj.confidence)
             LDMobj.xSpeed = obj.velocity.x
@@ -336,7 +334,7 @@ class ExtendedVehicleManager(VehicleManager):
         lidarPos = self.perception_manager.lidar.sensor.get_transform()
         translation = [LDMobj.xPosition, LDMobj.yPosition, lidarPos.location.z + 1.5]
         h, l, w = 1.5, LDMobj.length, LDMobj.width
-        rotation = np.deg2rad(90+LDMobj.yaw)
+        rotation = np.deg2rad(LDMobj.yaw)
 
         # Create a bounding box outline
         bounding_box = np.array([

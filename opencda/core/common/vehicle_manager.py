@@ -26,7 +26,6 @@ from opencda.core.map.map_manager import MapManager
 from opencda.core.common.data_dumper import DataDumper
 from opencda.customize.platooning.platooning_behavior_agent import PlatooningBehaviorAgentExtended
 from opencda.core.application.platooning.intruder_behavior_agent import IntruderBehaviorAgent
-from opencda.customize.msvan3t.msvan3t_agent import Msvan3tAgent
 
 
 class VehicleManager(object):

@@ -344,6 +344,16 @@ class ScenarioManager:
                         current_time=self.scenario_params['current_time'],
                         data_dumping=data_dump,
                         pldm=pldm, log_dir=log_dir)
+            elif 'ms-van3t' in cav_config['v2x']:
+                cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+                vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+                # create vehicle manager for each cav
+                vehicle_manager = ExtendedVehicleManager(
+                    vehicle, cav_config, application,
+                    self.carla_map, self.cav_world,
+                    current_time=self.scenario_params['current_time'],
+                    data_dumping=data_dump,
+                    pldm=pldm, log_dir=log_dir,ms_vanet=True)
             else:
                 cav_vehicle_bp.set_attribute('color', '0, 0, 255')
                 vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)

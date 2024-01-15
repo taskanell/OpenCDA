@@ -44,15 +44,14 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         self.tick_mutex = threading.Lock()
         self.tick_event = threading.Event()
         self.step_event = step_event
-        print("Carla_Adapter: " + str(self.GetCurrentTime()) + ": CarlaAdapter: __init__")
         print("Steplength: " + str(steplength))
         print("Seed: " + str(seed))
 
         # Set up the simulator in synchronous mode
-        # settings = world.get_settings()
-        # settings.synchronous_mode = True  # Enables synchronous mode
-        # settings.fixed_delta_seconds = steplength  # TODO: Make this configurable and based on the Veins configuration
-        # world.apply_settings(settings)
+        settings = self.world.get_settings()
+        settings.synchronous_mode = True  # Enables synchronous mode
+        settings.fixed_delta_seconds = steplength
+        self.world.apply_settings(settings)
 
         # Set up the TM in synchronous mode
         traffic_manager.set_synchronous_mode(True)
@@ -60,14 +59,22 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         # Set a seed so behaviour can be repeated if necessary
         traffic_manager.set_random_device_seed(seed)
         random.seed(seed)
-        print("Carla_Adapter: " + str(self.GetCurrentTime()) + ": CarlaAdapter: __init__ done")
-        self.generateTraffic(20)
-        # TODO: add a solution for variable penetration rate
+        if self.scenario_params['scenario']['background_traffic']:
+            self.generateTraffic(self.scenario_params['scenario']['background_traffic']['vehicle_num'])
+        self.steps = 0
+        self.time_offset = 0  # Aux variable to keep track of the time offset between CARLA and ms-van3t
 
     def generateTraffic(self, number):
         spawnPoints = self.world.get_map().get_spawn_points()
+        actor_list = self.world.get_actors()
+        vehicles = actor_list.filter('vehicle.*')
+        # discard spawn points that are too close to already spawned vehicles
+        for vehicle in vehicles:
+            for spawnPoint in spawnPoints:
+                if vehicle.get_location().distance(spawnPoint.location) < 5:
+                    spawnPoints.remove(spawnPoint)
         for n in range(number):
-            randInt = random.randint(0, len(self.world.get_map().get_spawn_points()) - 1)
+            randInt = random.randint(0, len(spawnPoints) - 1)
             spawn_point = spawnPoints[randInt]
             spawnPoints.pop(randInt)
             bp = random.choice(self.world.get_blueprint_library().filter('vehicle.*'))
@@ -76,33 +83,28 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
             vehicle.set_autopilot(True, 8000)
 
     def ExecuteOneTimeStep(self, request, context):
-        print("Carla_Adapter: " + str(self.GetCurrentTime()) + ": carla_adapter: ExecuteOneTimeStep")
+        if self.steps == 0:
+            self.time_offset = self.world.get_snapshot().elapsed_seconds
         self.step_event.wait()
         self.world.tick()
         self.step_event.clear()
         self.tick_event.set()
-        print("Carla_Adapter: " + str(self.GetCurrentTime()) + ": carla_adapter: ExecuteOneTimeStep done")
+        self.steps += 1
         return struct_pb2.Value()
 
     def GetManagedActorsIds(self, request, context):
         self.world.get_actors()
         actor_list = self.world.get_actors()
         vehicles = actor_list.filter('vehicle.*')
-        print("Carla_Adapter: GetManagedActorsIds: Found " + str(len(vehicles)) + " vehicles")
-        print(vehicles)
         returnValue = carla_pb2.ActorIds()
         for vehicle in vehicles:
             returnValue.actorId.append(vehicle.id)
-        print("Carla_Adapter: returning data")
-        print(returnValue)
         return returnValue
 
     def GetManagedActorById(self, request, context):
         self.world.get_actors()
         actor_list = self.world.get_actors()
-        # print("Carla_Adapter: GetManagedActorById: Looking for " + str(request.num))
         actor = actor_list.find(request.num)
-        # print("Carla_Adapter: GetManagedActorById: Found " + str(actor))
         aLocation = actor.get_location()
         aSpeed = actor.get_velocity()
         aAcceleration = actor.get_acceleration()
@@ -123,41 +125,71 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         returnValue.longitude = geoPos.longitude
         returnValue.length = actor.bounding_box.extent.x * 2
         returnValue.width = actor.bounding_box.extent.y * 2
-        print("bounding box: " + str(actor.bounding_box.extent.x) + ", " + str(actor.bounding_box.extent.y))
+        # print("bounding box: " + str(actor.bounding_box.extent.x) + ", " + str(actor.bounding_box.extent.y))
         # I take abs of lane_id https://github.com/carla-simulator/carla/issues/1469
         returnValue.lane = abs(self.world.get_map().get_waypoint(aLocation).lane_id)
-        print("Carla_Adapter: GetManagedActorById: Returning " + str(returnValue))
+        returnValue.heading = actor.get_transform().rotation.yaw
+        # This is redundant, but for CARLA compliance
+        returnValue.transform.location.x = actor.get_transform().location.x
+        returnValue.transform.location.y = actor.get_transform().location.y
+        returnValue.transform.location.z = actor.get_transform().location.z
+        returnValue.transform.rotation.pitch = actor.get_transform().rotation.pitch
+        returnValue.transform.rotation.yaw = actor.get_transform().rotation.yaw
+        returnValue.transform.rotation.roll = actor.get_transform().rotation.roll
+
         return returnValue
+
+    def GetManagedCAVsIds(self, request, context):
+        returnValue = carla_pb2.ActorIds()
+        for cav in self.cav_list:
+            returnValue.actorId.append(cav.vehicle.id)
+        return returnValue
+
+    def SetControl(self, request, context):
+        for cav in self.cav_list:
+            if cav.vehicle.id == request.id:
+                if request.waypoint.x == 0 and request.waypoint.y == 0 and request.waypoint.z == 0:
+                    wpt = self.world.get_map().get_waypoint(cav.localizer.get_ego_pos().location)
+                    next_wpt = wpt.next(max(2, int(cav.localizer.get_ego_spd() / 3.6 * 1)))[0]
+                    control = None
+                    if request.speed == 1:
+                        control = cav.controller.run_step(request.speed * 3.6, next_wpt.transform.location, request.acceleration)
+                        cav.vehicle.apply_control(control)
+                    else:
+                        control = cav.controller.run_step(request.speed * 3.6, next_wpt.transform.location, None)
+                        cav.vehicle.apply_control(control)
+                else:
+                    transform = carla.Transform(carla.Location(x=request.waypoint.x,
+                                                    y=request.waypoint.y,
+                                                    z=request.waypoint.z))
+                    wpt = self.world.get_map().get_waypoint(transform.location)
+                    next_wpt = wpt.next(max(2, int(cav.localizer.get_ego_spd() / 3.6 * 1)))[0]
+                    control = cav.controller.run_step(request.speed, next_wpt.transform.location, request.acceleration)
+                    cav.vehicle.apply_control(control)
+                return struct_pb2.Value()
+        return struct_pb2.Value()
 
     def InsertVehicle(self, request, context):
         blueprint_library = [bp for bp in self.world.get_blueprint_library().filter('vehicle.*')]
         vehicle_bp = blueprint_library[0]
         vehicle_transform = self.world.get_map().get_spawn_points()[2]
-        print("Carla_Adapter: Spawing new vehicle -> " + str(vehicle_bp) + " at " + str(vehicle_transform))
         vehicle = self.world.spawn_actor(vehicle_bp, vehicle_transform)
-        print("Carla_Adapter: Setting location to " + str(request.location.x) + ", " + str(
-            request.location.y) + ", " + str(request.location.z))
         loc = vehicle.get_location()
         loc.x = request.location.x
         loc.y = request.location.y
         loc.z = request.location.z + 5
         vehicle.set_location(loc)
         number = carla_pb2.Number(num=vehicle.id)
-        print("Carla_Adapter: Spawned new vehicle")
         vehicle.set_autopilot(True, 8000)
         return number
 
     def GetRandomSpawnPoint(self, request, context):
-        print("Carla_Adapter: GetRandomSpawnPoint")
         randInt = random.randint(0, len(self.world.get_map().get_spawn_points()) - 1)
-        print("Random int " + str(randInt))
         spawnPoint = self.world.get_map().get_spawn_points()[randInt]
         spectator = self.world.get_spectator()
         spectator.set_transform(carla.Transform(spawnPoint.location +
                                                 carla.Location(z=50),
                                                 carla.Rotation(pitch=-90)))
-        print(type(spawnPoint))
-        print("Carla_Adapter: SpawnPoint: " + str(spawnPoint))
         retvalue = carla_pb2.Transform()
         retvalue.location.x = spawnPoint.location.x
         retvalue.location.y = spawnPoint.location.y
@@ -175,48 +207,67 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                     ego_pos, ego_spd, objects = cav.getInfo()
                     returnValue = carla_pb2.Objects()
                     for PO in cav.LDM.getAllPOs():
-                        object = carla_pb2.Object()
-                        object.id = PO.id
-                        object.dx = PO.perception.xPosition - ego_pos.location.x
-                        object.dy = PO.perception.yPosition - ego_pos.location.y
-                        object.speed.x = PO.perception.xSpeed
-                        object.speed.y = PO.perception.ySpeed
-                        object.speed.z = 0
-                        object.acceleration.x = PO.perception.xacc
-                        object.acceleration.y = PO.perception.yacc
-                        object.acceleration.z = 0
-                        object.width = PO.perception.width
-                        object.length = PO.perception.length
-                        object.onSight = PO.onSight
-                        object.tracked = PO.tracked
-                        object.timestamp = int(PO.perception.timestamp)
-                        object.confidence = PO.perception.confidence
-                        returnValue.objects.append(object)
+                        if (PO.detected and PO.tracked and PO.onSight) or PO.CPM:
+                            object = carla_pb2.Object()
+                            object.id = PO.id
+                            object.dx = PO.perception.xPosition - ego_pos.location.x
+                            object.dy = PO.perception.yPosition - ego_pos.location.y
+                            object.speed.x = PO.perception.xSpeed
+                            object.speed.y = PO.perception.ySpeed
+                            object.speed.z = 0
+                            object.acceleration.x = PO.perception.xacc
+                            object.acceleration.y = PO.perception.yacc
+                            object.acceleration.z = 0
+                            object.width = PO.perception.width
+                            object.length = PO.perception.length
+                            object.onSight = PO.onSight
+                            object.tracked = PO.tracked
+                            object.timestamp = int(1000*(PO.getLatestPoint().timestamp-self.time_offset))
+                            object.confidence = PO.perception.confidence
+                            if PO.perception.yaw < 0:
+                                object.yaw = PO.perception.yaw + 360
+                            else:
+                                object.yaw = PO.perception.yaw
+                            object.transform.location.x = PO.perception.xPosition
+                            object.transform.location.y = PO.perception.yPosition
+                            object.transform.location.z = 0
+                            object.transform.rotation.pitch = 0
+                            object.transform.rotation.yaw = PO.perception.yaw
+                            object.transform.rotation.roll = 0
+                            object.detected = PO.detected
+                            if PO.CPM and len(PO.perceivedBy) > 0:
+                                object.perceivedBy = PO.perceivedBy[0]
+                            else:
+                                object.perceivedBy = cav.vehicle.id
+                            returnValue.objects.append(object)
                     return returnValue
-        print("Carla_Adapter: GetActorLDM: Actor not found")
 
     def InsertObject(self, request, context):
         for cav in self.cav_list:
             if cav.vehicle.id == request.egoId:
-                newPO = Perception(request.object.dx,
-                                   request.object.dy,
+                newPO = Perception(request.object.transform.location.x,
+                                   request.object.transform.location.y,
                                    request.object.width,
                                    request.object.length,
-                                   request.object.timestamp,
-                                   request.object.confidence,
+                                   float(request.object.timestamp/1000) + self.time_offset,
+                                   request.object.confidence/100,
                                    ID=request.object.id)
                 newPO.xSpeed = request.object.speed.x
                 newPO.ySpeed = request.object.speed.y
                 newPO.xacc = request.object.acceleration.x
                 newPO.yacc = request.object.acceleration.y
-                newPO.heading = request.object.heading
+                newPO.heading = request.object.yaw
+                newPO.yaw = request.object.yaw
                 toInsert = [newPO]
                 cav.ldm_mutex.acquire()
-                cav.LDM.CPMfusion(toInsert, request.fromId)
+                if request.object.detected:
+                    cav.LDM.CPMfusion(toInsert, request.fromId)
+
+                else:
+                    cav.LDM.CAMfusion(newPO)
                 cav.ldm_mutex.release()
                 return carla_pb2.Number(num=1)
 
-        print("Carla_Adapter: InsertObject: Actor not found")
         return carla_pb2.Number(num=0)
 
     def GetCartesian(self, request, context):
@@ -301,7 +352,7 @@ class MsVan3tCoScenarioManager():
         self.traffic_manager = traffic_manager
         self.cav_list = cav_list
         self.step_event = step_event
-        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
         self.carla_object = CarlaAdapter(1, 0.05, self.scenario_params,
                                          self.scenario_manager,
                                          self.cav_list,
@@ -310,5 +361,5 @@ class MsVan3tCoScenarioManager():
         carla_pb2_grpc.add_CarlaAdapterServicer_to_server(self.carla_object, self.server)
 
         grpcPort = self.server.add_insecure_port('localhost:1337')
-        print("Carla_Adapter: Create server on " + address + ":" + str(grpcPort))
+        print("OpenCDA Control Interface running on " + address + ":" + str(grpcPort))
         self.server.start()

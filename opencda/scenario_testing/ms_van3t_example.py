@@ -12,16 +12,24 @@ from opencda.scenario_testing.utils.yaml_utils import add_current_time
 from threading import Event
 from opencda.scenario_testing.utils.ms_van3t_cosim_api import MsVan3tCoScenarioManager
 
+
 def run_scenario(opt, scenario_params):
     try:
         scenario_params = add_current_time(scenario_params)
 
         cav_world = CavWorld(opt.apply_ml)
 
+        if 'name' in scenario_params['scenario']['town']:
+            town = scenario_params['scenario']['town']['name']
+        else:
+            print('No town name has been specified, please check the yaml file.')
+            raise ValueError
+
+        # create co-simulation scenario manager
         scenario_manager = sim_api.ScenarioManager(scenario_params,
                                                    opt.apply_ml,
                                                    opt.version,
-                                                   town='Town05',
+                                                   town=town,
                                                    cav_world=cav_world)
 
         single_cav_list = \
@@ -38,21 +46,19 @@ def run_scenario(opt, scenario_params):
                                      traffic_manager,
                                      step_event)
 
-        # spectator = scenario_manager.world.get_spectator()
-        # spectator.set_transform(carla.Transform(carla.Location(0, 0, 20),
-        #                                         carla.Rotation(pitch=-90)))
         spectator = scenario_manager.world.get_spectator()
-        spectator_vehicle = single_cav_list[1].vehicle
+        spectator_vehicle = single_cav_list[3].vehicle
         transform = spectator_vehicle.get_transform()
         spectator.set_transform(carla.Transform(transform.location +
-                                                carla.Location(z=20),
+                                                carla.Location(z=60),
                                                 carla.Rotation(pitch=-90)))
         scenario_manager.tick()
+
         while True:
 
             transform = spectator_vehicle.get_transform()
             spectator.set_transform(carla.Transform(transform.location +
-                                                    carla.Location(z=50),
+                                                    carla.Location(z=60),
                                                     carla.Rotation(pitch=-90)))
 
             for i, single_cav in enumerate(single_cav_list):

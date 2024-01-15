@@ -101,6 +101,7 @@ class ObstacleVehicle(object):
     def __init__(self, corners, o3d_bbx,
                  vehicle=None, lidar=None, sumo2carla_ids=None, confidence=0.0):
 
+        self.o3d_obb = None
         if not vehicle:
             self.bounding_box = BoundingBox(corners)
             self.location = self.bounding_box.location
@@ -110,7 +111,6 @@ class ObstacleVehicle(object):
             self.carla_id = -1
             self.velocity = carla.Vector3D(0.0, 0.0, 0.0)
             self.yaw = 0.0
-            self.o3d_obb = None
             self.confidence = confidence
         else:
             if sumo2carla_ids is None:

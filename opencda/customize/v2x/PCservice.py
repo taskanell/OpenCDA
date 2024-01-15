@@ -4,9 +4,6 @@ import numpy as np
 import weakref
 from threading import Thread
 from threading import Event
-from proton import Message, Url
-from proton.handlers import MessagingHandler
-from proton.reactor import Container
 
 from opencda.customize.platooning.states import FSM
 from collections import deque
