@@ -1,4 +1,4 @@
-name: opencda_2
+name: opencda_test
 channels:
   - defaults
 dependencies:
@@ -20,3 +20,7 @@ dependencies:
     - seaborn
     - lxml
     - shapely==1.8.4
+    - omegaconf
+    - sklearn
+    - zmq
+    - pyzmq

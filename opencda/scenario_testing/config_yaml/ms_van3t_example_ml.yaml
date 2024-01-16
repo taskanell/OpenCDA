@@ -4,119 +4,15 @@ carla_traffic_manager:
   ignore_lights_percentage: 0
   vehicle_list:
   - spawn_position:
-    - 100.0337
-    - 143.51
+    - 131.032
+    - 139.51
     - 0.3
     - 0
     - 0
     - 0
     vehicle_speed_perc: -200
   - spawn_position:
-    - 56.7748
-    - 146.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 55.626
-    - 136.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 128.068
-    - 149.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 70.9991
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 148.1325
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 145.4621
-    - 136.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 102.0434
-    - 136.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 107.3715
-    - 146.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 125.3755
-    - 146.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 83.4049
-    - 146.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 135.6879
-    - 143.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 96.1414
-    - 146.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 77.1162
-    - 149.51
-    - 0.3
-    - 0
-    - 0
-    - 0
-    vehicle_speed_perc: -200
-  - spawn_position:
-    - 89.786
+    - 121.5344
     - 143.51
     - 0.3
     - 0
@@ -127,7 +23,7 @@ carla_traffic_manager:
 vehicle_base:
   sensing:
     perception:
-      activate: true # when not activated, objects positions will be retrieved from server directly
+      activate: false # when not activated, objects positions will be retrieved from server directly
       camera:
         visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
         num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -155,7 +51,7 @@ vehicle_base:
   behavior: &base_behavior
     max_speed: 70 # maximum speed, km/h
     tailgate_speed: 80 # when a vehicles needs to be close to another vehicle asap
-    overtake_allowed: false # whether overtake allowed, typically false for platoon leader
+    overtake_allowed: true # whether overtake allowed, typically false for platoon leader
     collision_time_ahead: 1.1 # used for collision checking
 
 platoon_base:
@@ -166,6 +62,10 @@ platoon_base:
 
 
 scenario:
+  town:
+    name: Town06
+  background_traffic:
+    vehicle_num: 20
   single_cav_list: # this is for merging vehicle or single cav without v2x
     - name: cav1
       spawn_position: [121.7194, 139.51, 0.3, 0, 0, 0]
@@ -174,7 +74,7 @@ scenario:
         perception:
           activate: true
           camera:
-            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
             # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
             positions:
@@ -186,8 +86,7 @@ scenario:
             visualize: true
       v2x:
         communication_range: 35
-        platoon_init_pos: 1
-        pldm: true
+        ms-van3t: true # whether to use ms-van3t for communication
       behavior:
         <<: *base_behavior
         max_speed: 70 # maximum speed, km/h
@@ -198,13 +97,13 @@ scenario:
           debug: false
 
     - name: cav2
-      spawn_position: [111.7194, 139.51, 0.3, 0, 0, 0]
+      spawn_position: [111.7194, 143.51, 0.3, 0, 0, 0]
       destination: [606.87, 145.39, 0]
       sensing:
         perception:
           activate: true
           camera:
-            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
             # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
             positions:
@@ -216,8 +115,7 @@ scenario:
             visualize: true
       v2x:
         communication_range: 35
-        platoon_init_pos: 2
-        pldm: true
+        ms-van3t: true
       behavior:
         <<: *base_behavior
         max_speed: 100 # maximum speed, km/h
@@ -234,7 +132,7 @@ scenario:
         perception:
           activate: true
           camera:
-            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
             # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
             positions:
@@ -246,8 +144,7 @@ scenario:
             visualize: true
       v2x:
         communication_range: 35
-        platoon_init_pos: 3
-        pldm: true
+        ms-van3t: true
       behavior:
         <<: *base_behavior
         max_speed: 100 # maximum speed, km/h
@@ -258,13 +155,13 @@ scenario:
           debug: false
 
     - name: cav4
-      spawn_position: [91.7194, 139.51, 0.3, 0, 0, 0]
+      spawn_position: [91.7194, 146.51, 0.3, 0, 0, 0]
       destination: [606.87, 145.39, 0]
       sensing:
         perception:
           activate: true
           camera:
-            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
             # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
             positions:
@@ -276,8 +173,7 @@ scenario:
             visualize: true
       v2x:
         communication_range: 35
-        platoon_init_pos: 4
-        pldm: true
+        ms-van3t: true
       behavior:
         <<: *base_behavior
         max_speed: 100 # maximum speed, km/h

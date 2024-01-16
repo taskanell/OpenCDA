@@ -33,7 +33,7 @@ from opencda.scenario_testing.utils.sim_api import ScenarioManager
 
 class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
     def __init__(self, seed, steplength, scenario_params,
-                 scenario_manager, cav_list, traffic_manager, step_event):
+                 scenario_manager, cav_list, traffic_manager, step_event, stop_event):
         self.scenario_params = scenario_params
         self.scenario_manager = scenario_manager
         self.cav_list = cav_list
@@ -42,10 +42,10 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         self.client = scenario_manager.client
         self.tick = False
         self.tick_mutex = threading.Lock()
-        self.tick_event = threading.Event()
-        self.step_event = step_event
+        self.tick_event = threading.Event() # Aux variable to synchronize the simulation
+        self.step_event = step_event # Aux variable to synchronize the simulation
+        self.stop_event = stop_event # Aux variable to stop the simulation
         print("Steplength: " + str(steplength))
-        print("Seed: " + str(seed))
 
         # Set up the simulator in synchronous mode
         settings = self.world.get_settings()
@@ -86,8 +86,11 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         if self.steps == 0:
             self.time_offset = self.world.get_snapshot().elapsed_seconds
         self.step_event.wait()
-        self.world.tick()
         self.step_event.clear()
+        if self.stop_event.is_set():
+            self.stop_event.clear()
+            return carla_pb2.Boolean(value=False)
+        self.world.tick()
         self.tick_event.set()
         self.steps += 1
         return carla_pb2.Boolean(value=True)
@@ -346,20 +349,27 @@ class MsVan3tCoScenarioManager():
     """
 
     def __init__(self, scenario_params, scenario_manager,cav_list,traffic_manager,step_event,
+                 stop_event,
                  address='localhost'):
         self.scenario_params = scenario_params
         self.scenario_manager = scenario_manager
         self.traffic_manager = traffic_manager
         self.cav_list = cav_list
         self.step_event = step_event
+        self.stop_event = stop_event
         self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
         self.carla_object = CarlaAdapter(1, 0.05, self.scenario_params,
                                          self.scenario_manager,
                                          self.cav_list,
                                          self.traffic_manager,
-                                         self.step_event)
+                                         self.step_event,
+                                         self.stop_event)
         carla_pb2_grpc.add_CarlaAdapterServicer_to_server(self.carla_object, self.server)
 
         grpcPort = self.server.add_insecure_port('localhost:1337')
         print("OpenCDA Control Interface running on " + address + ":" + str(grpcPort))
+
+        # write "ready" to a file to signal that the server is ready
+        with open("/tmp/opencdaCI_ready", "w") as f:
+            f.write("ready")
         self.server.start()

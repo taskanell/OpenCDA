@@ -39,12 +39,14 @@ def run_scenario(opt, scenario_params):
             scenario_manager.create_traffic_carla()
 
         step_event = Event()
+        stop_event = Event()
         ms_van3t_manager = \
             MsVan3tCoScenarioManager(scenario_params,
                                      scenario_manager,
                                      single_cav_list,
                                      traffic_manager,
-                                     step_event)
+                                     step_event=step_event,
+                                     stop_event=stop_event)
 
         spectator = scenario_manager.world.get_spectator()
         spectator_vehicle = single_cav_list[3].vehicle
@@ -71,6 +73,9 @@ def run_scenario(opt, scenario_params):
             ms_van3t_manager.carla_object.tick_event.clear()
 
     finally:
+        stop_event.set() # stop the co-simulation
+        step_event.set() # stop the co-simulation
         scenario_manager.close()
+        print("Simulation finished.")
         for v in single_cav_list:
             v.destroy()
