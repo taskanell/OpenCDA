@@ -1,4 +1,4 @@
-name: opencda_test
+name: opencda
 channels:
   - defaults
 dependencies:
@@ -24,3 +24,4 @@ dependencies:
     - sklearn
     - zmq
     - pyzmq
+    - carla==0.9.12
