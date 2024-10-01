@@ -122,27 +122,36 @@ def compute_IoU(box1, box2):
 
 
 def compute_IoU_lineSet(set1, set2):
-    # Calculate the Intersection over Union between two bbx
+    # Calculate the Intersection over Union between two bounding boxes
+
+    # Calculate intersection bounds
     intersection_min = np.maximum(set1.get_min_bound(), set2.get_min_bound())
     intersection_max = np.minimum(set1.get_max_bound(), set2.get_max_bound())
     intersection_size = np.maximum(0, intersection_max - intersection_min)
 
+    # Ensure points are numpy arrays
     points1 = np.asarray(set1.points)
     points2 = np.asarray(set2.points)
-    length1 = np.linalg.norm(points1[0] - points1[1])
-    length2 = np.linalg.norm(points2[0] - points2[1])
-    width1 = np.linalg.norm(points1[1] - points1[2])
-    width2 = np.linalg.norm(points2[1] - points2[2])
-    height1 = np.linalg.norm(points1[2] - points1[4])
-    height2 = np.linalg.norm(points2[2] - points2[4])
 
+    # Compute dimensions of the bounding boxes
+    length1 = np.linalg.norm(points1[1] - points1[0])
+    length2 = np.linalg.norm(points2[1] - points2[0])
+    width1 = np.linalg.norm(points1[2] - points1[1])
+    width2 = np.linalg.norm(points2[2] - points2[1])
+    height1 = abs(points1[4][2] - points1[2][2])
+    height2 = abs(points2[4][2] - points2[2][2])
+
+    # Compute volumes of the bounding boxes
     volume_box1 = length1 * width1 * height1
     volume_box2 = length2 * width2 * height2
-    # volume_box1 = np.prod(set1.get_oriented_bounding_box().extent)
-    # volume_box2 = np.prod(set2.get_oriented_bounding_box().extent)
 
+    # Compute volume of intersection
     volume_intersection = np.prod(intersection_size)
+
+    # Compute volume of union
     volume_union = volume_box1 + volume_box2 - volume_intersection
+
+    # Compute IoU
     if volume_union == 0:
         iou = 0
     else:
@@ -411,6 +420,87 @@ def get_o3d_bbx(cav, x, y, xe, ye, heading):
     max_boundary_sensor = np.max(stack_boundary_sensor_cords, axis=1)
 
     geometry = o3d.geometry.AxisAlignedBoundingBox(min_boundary_sensor, max_boundary_sensor)
+    # geometry = o3d.geometry.AxisAlignedBoundingBox(min_bound, max_bound)
+    geometry.color = (0, 1, 0)
+    return geometry, line_set
+
+def get_abs_o3d_bbx(x, y, xe, ye, heading):
+    translation = [x, y, 2.25]
+    h, l, w = 1.5, ye, xe
+    rotation = np.deg2rad(heading)
+
+    # Create a bounding box outline
+    bounding_box = np.array([
+        [-l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2],
+        [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2],
+        [-h / 2, -h / 2, -h / 2, -h / 2, h / 2, h / 2, h / 2, h / 2]])
+
+    # Standard 3x3 rotation matrix around the Z axis
+    rotation_matrix = np.array([
+        [np.cos(rotation), -np.sin(rotation), 0.0],
+        [np.sin(rotation), np.cos(rotation), 0.0],
+        [0.0, 0.0, 1.0]])
+
+    # Repeat the [x, y, z] eight times
+    eight_points = np.tile(translation, (8, 1))
+
+    # Translate the rotated bounding box by the
+    # original center position to obtain the final box
+    corner_box = np.dot(
+        rotation_matrix, bounding_box) + eight_points.transpose()
+
+    new_element = np.array([[1, 1, 1, 1, 1, 1, 1, 1]])
+    corner_box = np.append(corner_box, new_element, axis=0)
+    corner_box[:1, :] = - corner_box[:1, :]
+    corner_box = corner_box[:-1, :]
+    corner_box = corner_box.transpose()
+
+    lines = [[0, 1], [1, 2], [2, 3], [0, 3],
+             [4, 5], [5, 6], [6, 7], [4, 7],
+             [0, 4], [1, 5], [2, 6], [3, 7]]
+
+    # Use the same color for all lines
+    colors = [[1, 0, 0] for _ in range(len(lines))]
+
+
+
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(corner_box)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    line_set.colors = o3d.utility.Vector3dVector(colors)
+
+    yaw = np.deg2rad(heading)
+    c, s = np.cos(yaw), np.sin(yaw)
+    R = np.array([[c, -s], [s, c]])
+    local_corners = np.array([
+        [-xe / 2, -ye / 2],
+        [xe / 2, -ye / 2],
+        [xe / 2, ye / 2],
+        [-xe / 2, ye / 2]
+    ])
+    world_corners = np.dot(R, local_corners.T).T + np.array([x, y])
+
+    min_boundary = np.array([np.min(world_corners, axis=0)[0],
+                             np.min(world_corners, axis=0)[1],
+                             1.5,
+                             1])
+    max_boundary = np.array([np.max(world_corners, axis=0)[0],
+                             np.max(world_corners, axis=0)[1],
+                             1.5 + 1.5,
+                             1])
+    min_boundary = min_boundary.reshape((4, 1))
+    max_boundary = max_boundary.reshape((4, 1))
+    stack_boundary = np.hstack((min_boundary, max_boundary))
+    # convert unreal space to o3d space
+    stack_boundary[:1, :] = - \
+        stack_boundary[:1, :]
+    # (4,2) -> (3, 2)
+    stack_boundary = stack_boundary[:-1, :]
+
+    min_boundary = np.min(stack_boundary, axis=1)
+    max_boundary = np.max(stack_boundary, axis=1)
+
+    geometry = o3d.geometry.AxisAlignedBoundingBox(min_boundary, max_boundary)
     # geometry = o3d.geometry.AxisAlignedBoundingBox(min_bound, max_bound)
     geometry.color = (0, 1, 0)
     return geometry, line_set

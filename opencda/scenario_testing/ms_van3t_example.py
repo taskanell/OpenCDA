@@ -30,7 +30,9 @@ def run_scenario(opt, scenario_params):
                                                    opt.apply_ml,
                                                    opt.version,
                                                    town=town,
-                                                   cav_world=cav_world)
+                                                   cav_world=cav_world,
+                                                   carla_host=opt.host,
+                                                   carla_port=opt.port)
 
         single_cav_list = \
             scenario_manager.create_vehicle_manager(application=['single'])

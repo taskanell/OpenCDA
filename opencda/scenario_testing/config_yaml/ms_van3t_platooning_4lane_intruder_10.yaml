@@ -1,73 +1,71 @@
-#carla_traffic_manager:
-#  global_distance: 4.0
-#  global_speed_perc: -50
-#  ignore_lights_percentage: 0
-#  vehicle_list:
-#  - spawn_position:
-#    - -403
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -417
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -380
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -365
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -350
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -380
-#    - 34
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -350
-#    - 34
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -400
-#    - 27
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
 
+carla_traffic_manager:
+  global_distance: 10.0 # the minimum distance in meters that vehicles have to keep with the rest
+  global_speed_perc: -200
+  vehicle_list:
+    - spawn_position: [288.8, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [570.6, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [589.6, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [432.9, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [540.6, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [267.7, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [307.3, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [436.8, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [275.2, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [304.5, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [545.6, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [492.5, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [214.2, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [463.4, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [412.7, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [287.5, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [246.5, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [268.3, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [526.5, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [342.4, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [423.3, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [366.7, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [502.1, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [572.8, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [231.1, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [383.8, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [585.7, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [278.4, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [392.3, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [525.4, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [240.4, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [258.1, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [363.1, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [377.9, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [565.9, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [406.4, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [351.5, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [209.2, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [598.1, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [202.8, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [520.7, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [321.6, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [331.7, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [550.1, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [557.9, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [316.7, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [319.4, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [557.1, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [343.1, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [233.9, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [490.7, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [466.3, -495.2, 0.3, 0, 0, 0]
+    - spawn_position: [394.0, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [304.8, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [263.7, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [596.1, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [363.4, -492.0, 0.3, 0, 0, 0]
+    - spawn_position: [438.8, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [412.4, -498.4, 0.3, 0, 0, 0]
+    - spawn_position: [253.0, -492.0, 0.3, 0, 0, 0]
+
+
+# First define the basic parameters of the vehicles
 vehicle_base:
   sensing:
     perception:
@@ -82,7 +80,7 @@ vehicle_base:
           - [ 0.0, -0.3, 1.8, -100 ]
           - [ -2.0, 0.0, 1.5, 180 ]
       lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-        visualize: true
+        visualize: false
 
     localization: &base_localize
       activate: false # when not activated, ego position will be retrieved from server directly
@@ -102,81 +100,76 @@ vehicle_base:
     overtake_allowed: false # whether overtake allowed, typically false for platoon leader
     collision_time_ahead: 1.1 # used for collision checking
 
-platoon_base:
-  max_capacity: 10
-  inter_gap: 0.2 # desired time gap
-  open_gap: 1.0 # open gap
-  warm_up_speed: 30 # required speed before cooperative merging
 
 
 scenario:
   background_traffic:
     vehicle_num: 0
-  single_cav_list: # this is for merging vehicle or single cav without v2x
-#    - name: cav1
-#      spawn_position: [-313, 34, 0.3, 0, 0, 0]
-#      destination: [340, 34, 0]
-#      sensing:
-#        perception:
-#          activate: false
-#          camera:
-#            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
-#            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
-#            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
-#            positions:
-#              - [2.5, 0, 1.0, 0]
-#              - [0.0, 0.3, 1.8, 100]
-#              - [0.0, -0.3, 1.8, -100]
-#              - [-2.0, 0.0, 1.5, 180]
-#          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-#            visualize: false
-#      v2x:
-#        communication_range: 35
-#        ms-van3t: true
-#      behavior:
-#        <<: *base_behavior
-#        max_speed: 70 # maximum speed, km/h
-#        tailgate_speed: 111
-#        overtake_allowed: false
-#        local_planner:
-#          debug_trajectory: true
-#          debug: false
-#
-#    - name: cav2
-#      spawn_position: [-323, 34, 0.3, 0, 0, 0]
-#      destination: [340, 34, 0]
-#      sensing:
-#        perception:
-#          activate: false
-#          camera:
-#            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
-#            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
-#            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
-#            positions:
-#              - [2.5, 0, 1.0, 0]
-#              - [0.0, 0.3, 1.8, 100]
-#              - [0.0, -0.3, 1.8, -100]
-#              - [-2.0, 0.0, 1.5, 180]
-#          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-#            visualize: false
-#      v2x:
-#        communication_range: 35
-#        ms-van3t: true
-#      behavior:
-#        <<: *base_behavior
-#        max_speed: 100 # maximum speed, km/h
-#        tailgate_speed: 111
-#        overtake_allowed: true
-#        local_planner:
-#          debug_trajectory: true
-#          debug: false
-
-    - name: cav3
-      spawn_position: [-333, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+  single_cav_list:
+    - name: cav1
+      spawn_position: [600, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
       sensing:
         perception:
-          activate: false
+          activate: true
+          camera:
+            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions:
+              - [2.5, 0, 1.0, 0]
+              - [0.0, 0.3, 1.8, 100]
+              - [0.0, -0.3, 1.8, -100]
+              - [-2.0, 0.0, 1.5, 180]
+          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+            visualize: false
+      v2x:
+        communication_range: 35
+        ms-van3t: true
+      behavior:
+        <<: *base_behavior
+        max_speed: 70 # maximum speed, km/h
+        tailgate_speed: 111
+        overtake_allowed: false
+        local_planner:
+          debug_trajectory: true
+          debug: false
+
+    - name: cav2
+      spawn_position: [590, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
+      sensing:
+        perception:
+          activate: true
+          camera:
+            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions:
+              - [2.5, 0, 1.0, 0]
+              - [0.0, 0.3, 1.8, 100]
+              - [0.0, -0.3, 1.8, -100]
+              - [-2.0, 0.0, 1.5, 180]
+          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+            visualize: false
+      v2x:
+        communication_range: 35
+        ms-van3t: true
+      behavior:
+        <<: *base_behavior
+        max_speed: 100 # maximum speed, km/h
+        tailgate_speed: 111
+        overtake_allowed: true
+        local_planner:
+          debug_trajectory: true
+          debug: false
+
+    - name: cav3
+      spawn_position: [580, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
+      sensing:
+        perception:
+          activate: true
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -201,11 +194,11 @@ scenario:
           debug: false
 
     - name: cav4
-      spawn_position: [-343, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [570, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
       sensing:
         perception:
-          activate: false
+          activate: true
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -229,11 +222,11 @@ scenario:
           debug_trajectory: true
           debug: false
     - name: cav5
-      spawn_position: [-353, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [560, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
       sensing:
         perception:
-          activate: false
+          activate: true
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -258,11 +251,11 @@ scenario:
           debug: false
 
     - name: cav6
-      spawn_position: [-363, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [550, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
       sensing:
         perception:
-          activate: false
+          activate: true
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -287,11 +280,11 @@ scenario:
           debug: false
 
     - name: cav7
-      spawn_position: [-373, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [540, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
       sensing:
         perception:
-          activate: false
+          activate: true
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -316,11 +309,11 @@ scenario:
           debug: false
 
     - name: cav8
-      spawn_position: [-383, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [530, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
       sensing:
         perception:
-          activate: false
+          activate: true
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -345,11 +338,11 @@ scenario:
           debug: false
 
     - name: cav9
-      spawn_position: [-393, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [520, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
       sensing:
         perception:
-          activate: false
+          activate: true
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -374,11 +367,11 @@ scenario:
           debug: false
 
     - name: cav10
-      spawn_position: [-403, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [510, -488.799988, 0.3, 0, 0, 0]
+      destination: [3000, 14, 0.3]
       sensing:
         perception:
-          activate: false
+          activate: true
           camera:
             visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
             num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
@@ -402,9 +395,13 @@ scenario:
           debug_trajectory: true
           debug: false
 
-    - name: cav11
-      spawn_position: [-413, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+    - name: intruder
+      #Waypoint(Transform(Location(x=620.923035, y=-256.984619, z=0.000000), Rotation(pitch=0.000000, yaw=-22.619864, roll=0.000000)))
+      spawn_position: [ 600.615356, -248.523071, 0.3, 0, -22.619864, 0]
+      # when this is defined, the above parameter will be ignored, and a special map function will
+      # be used to define the spawn position based on the argument
+      # spawn_special: [0.55]
+      destination: [3000, 14.0, 0]
       sensing:
         perception:
           activate: false
@@ -422,6 +419,7 @@ scenario:
       v2x:
         communication_range: 35
         ms-van3t: true
+        intruder: true
       behavior:
         <<: *base_behavior
         max_speed: 100 # maximum speed, km/h

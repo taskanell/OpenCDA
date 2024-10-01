@@ -172,7 +172,9 @@ class ScenarioManager:
                  carla_version,
                  xodr_path=None,
                  town=None,
-                 cav_world=None):
+                 cav_world=None,
+                 carla_host='localhost',
+                 carla_port=2000):
         self.scenario_params = scenario_params
         self.carla_version = carla_version
 
@@ -184,7 +186,7 @@ class ScenarioManager:
             random.seed(simulation_config['seed'])
 
         self.client = \
-            carla.Client('localhost', simulation_config['client_port'])
+            carla.Client(carla_host, carla_port)
         self.client.set_timeout(10.0)
 
         if xodr_path:
@@ -223,6 +225,7 @@ class ScenarioManager:
         # Define probabilities for each type of blueprint
         self.use_multi_class_bp = scenario_params["blueprint"][
             'use_multi_class_bp'] if 'blueprint' in scenario_params else False
+
         if self.use_multi_class_bp:
             # bbx/blueprint meta
             with open(scenario_params['blueprint']['bp_meta_path']) as f:
@@ -238,6 +241,7 @@ class ScenarioManager:
         self.cav_world = cav_world
         self.carla_map = self.world.get_map()
         self.apply_ml = apply_ml
+
     @staticmethod
     def set_weather(weather_settings):
         """
@@ -320,32 +324,54 @@ class ScenarioManager:
                         yaw=cav_config['spawn_position'][4],
                         roll=cav_config['spawn_position'][3]))
             else:
-                spawn_transform = map_helper(self.carla_version,
-                                             *cav_config['spawn_special'])
+                # spawn_transform = map_helper(self.carla_version,
+                #                             cav_config['spawn_special'][0])
+                transform_point = carla.Transform(carla.Location(x=-1202.0827,
+                                                                 y=458.2501,
+                                                                 z=0.3),
+                                                  carla.Rotation(yaw=-20.4866))
 
-            if 'intruder' in cav_config['v2x']:
-                if cav_config['v2x']['intruder']:
-                    cav_vehicle_bp.set_attribute('color', '255, 0, 0')
-                    vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+                begin_point = carla.Transform(carla.Location(x=-16.7102,
+                                                             y=15.3622,
+                                                             z=0.3),
+                                              carla.Rotation(yaw=-20.4866))
 
-                    vehicle_manager = ExtendedVehicleManager(
-                        vehicle, cav_config, 'intruder',
-                        self.carla_map, self.cav_world,
-                        current_time=self.scenario_params['current_time'],
-                        data_dumping=data_dump,
-                        pldm=False, log_dir=log_dir)
-                else:
-                    cav_vehicle_bp.set_attribute('color', '0, 0, 255')
-                    vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
-                    # create vehicle manager for each cav
-                    vehicle_manager = ExtendedVehicleManager(
-                        vehicle, cav_config, application,
-                        self.carla_map, self.cav_world,
-                        current_time=self.scenario_params['current_time'],
-                        data_dumping=data_dump,
-                        pldm=pldm, log_dir=log_dir)
-            elif 'ms-van3t' in cav_config['v2x']:
+                transform_point.location.x = transform_point.location.x + cav_config['spawn_special'][0] * \
+                                             (begin_point.location.x -
+                                              transform_point.location.x)
+                transform_point.location.y = transform_point.location.y + cav_config['spawn_special'][0] * \
+                                             (begin_point.location.y -
+                                              transform_point.location.y)
+                spawn_transform = transform_point
+                # self.world.debug.draw_string(ego_pos.location, str(self.vehicle.id), False, carla.Color(200, 200, 0))
+
+
+            # if 'intruder' in cav_config['v2x']:
+            #     if cav_config['v2x']['intruder']:
+            #         cav_vehicle_bp.set_attribute('color', '255, 0, 0')
+            #         vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+            #
+            #         vehicle_manager = ExtendedVehicleManager(
+            #             vehicle, cav_config, 'intruder',
+            #             self.carla_map, self.cav_world,
+            #             current_time=self.scenario_params['current_time'],
+            #             data_dumping=data_dump,
+            #             pldm=False, log_dir=log_dir)
+            #     else:
+            #         cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+            #         vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+            #         # create vehicle manager for each cav
+            #         vehicle_manager = ExtendedVehicleManager(
+            #             vehicle, cav_config, application,
+            #             self.carla_map, self.cav_world,
+            #             current_time=self.scenario_params['current_time'],
+            #             data_dumping=data_dump,
+            #             pldm=pldm, log_dir=log_dir)
+            if 'ms-van3t' in cav_config['v2x']:
                 cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+                if 'intruder' in cav_config['v2x']:
+                    cav_vehicle_bp.set_attribute('color', '255, 0, 0')
+                # print ('transform:', spawn_transform)
                 vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
                 # create vehicle manager for each cav
                 vehicle_manager = ExtendedVehicleManager(
@@ -353,9 +379,12 @@ class ScenarioManager:
                     self.carla_map, self.cav_world,
                     current_time=self.scenario_params['current_time'],
                     data_dumping=data_dump,
-                    pldm=pldm, log_dir=log_dir,ms_vanet=True)
+                    pldm=pldm, log_dir=log_dir, ms_vanet=True)
             else:
-                cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+                if 'spawn_special' not in cav_config:
+                    cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+                else:
+                    cav_vehicle_bp.set_attribute('color', '255, 0, 0')
                 vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
                 # create vehicle manager for each cav
                 vehicle_manager = ExtendedVehicleManager(
@@ -612,7 +641,7 @@ class ScenarioManager:
             prob = [self.bp_class_sample_prob[itm] for itm in label_list]
 
         # if not random select, we always choose lincoln.mkz with green color
-        color = '128, 128, 128'
+        color = '0, 255, 0'
         default_model = 'vehicle.lincoln.mkz2017' \
             if self.carla_version == '0.9.11' else 'vehicle.lincoln.mkz_2017'
         ego_vehicle_bp = blueprint_library.find(default_model)
@@ -647,7 +676,7 @@ class ScenarioManager:
                     ego_vehicle_bp.set_attribute('color', color)
 
             vehicle = self.world.spawn_actor(ego_vehicle_bp, spawn_transform)
-            vehicle.set_autopilot(True, 8000)
+            vehicle.set_autopilot(True, tm.get_port())
 
             if 'vehicle_speed_perc' in vehicle_config:
                 tm.vehicle_percentage_speed_difference(
@@ -756,7 +785,7 @@ class ScenarioManager:
             if not vehicle:
                 continue
 
-            vehicle.set_autopilot(True, 8000)
+            vehicle.set_autopilot(True, tm.get_port())
             tm.auto_lane_change(vehicle, traffic_config['auto_lane_change'])
 
             if 'ignore_lights_percentage' in traffic_config:
@@ -774,7 +803,7 @@ class ScenarioManager:
 
         return bg_list
 
-    def create_traffic_carla(self):
+    def create_traffic_carla(self, port=8000):
         """
         Create traffic flow.
 
@@ -788,7 +817,10 @@ class ScenarioManager:
         """
         print('Spawning CARLA traffic flow.')
         traffic_config = self.scenario_params['carla_traffic_manager']
-        tm = self.client.get_trafficmanager()
+        if port != 8000:
+            tm = self.client.get_trafficmanager(port)
+        else:
+            tm = self.client.get_trafficmanager()
 
         tm.set_global_distance_to_leading_vehicle(
             traffic_config['global_distance'])
@@ -810,6 +842,56 @@ class ScenarioManager:
 
         print('CARLA traffic flow generated.')
         return tm, bg_list
+
+    def create_traffic_carla_by_number(self, vehicle_number):
+        traffic_config = self.scenario_params['carla_traffic_manager']
+        tm = self.client.get_trafficmanager()
+
+        tm.set_global_distance_to_leading_vehicle(
+            traffic_config['global_distance'])
+        tm.set_synchronous_mode(traffic_config['sync_mode'])
+        tm.set_osm_mode(traffic_config['set_osm_mode'])
+        tm.global_percentage_speed_difference(
+            traffic_config['global_speed_perc'])
+
+        spawnPoints = self.world.get_map().get_spawn_points()
+        for n in range(vehicle_number):
+            randInt = random.randint(0, len(spawnPoints) - 1)
+            spawn_point = spawnPoints[randInt]
+            spawnPoints.pop(randInt)
+            bp = random.choice(self.world.get_blueprint_library().filter('vehicle.*'))
+            bp.set_attribute('role_name', 'autopilot')
+            vehicle = self.world.spawn_actor(bp, spawn_point)
+            vehicle.set_autopilot(True, 8000)
+            tm.auto_lane_change(vehicle, traffic_config['auto_lane_change'])
+            tm.ignore_lights_percentage(vehicle, 0)
+
+    def create_traffic_carla_by_spawn_point(self, spawnPoints):
+
+        traffic_config = self.scenario_params['carla_traffic_manager']
+        tm = self.client.get_trafficmanager()
+
+        tm.set_global_distance_to_leading_vehicle(
+            traffic_config['global_distance'])
+        tm.set_synchronous_mode(traffic_config['sync_mode'])
+        tm.set_osm_mode(traffic_config['set_osm_mode'])
+        tm.global_percentage_speed_difference(
+            traffic_config['global_speed_perc'])
+
+        # iterate over the spawn points and do self.world.debug.draw_string(spawnPoints[i].location, str(round(0)), False, carla.Color(200, 200, 0), 10)
+        sps = self.world.get_map().get_spawn_points()
+        for i in range(len(sps)):
+            self.world.debug.draw_string(sps[i].location, str(round(i)), False, carla.Color(200, 200, 0), 100)
+
+        spawn_points = self.world.get_map().get_spawn_points()
+        for sp in spawnPoints:
+            spawn_point = spawn_points[sp]
+            bp = random.choice(self.world.get_blueprint_library().filter('vehicle.*'))
+            bp.set_attribute('role_name', 'autopilot')
+            vehicle = self.world.spawn_actor(bp, spawn_point)
+            vehicle.set_autopilot(True, 8000)
+            tm.auto_lane_change(vehicle, traffic_config['auto_lane_change'])
+            tm.ignore_lights_percentage(vehicle, 0)
 
     def tick(self):
         """

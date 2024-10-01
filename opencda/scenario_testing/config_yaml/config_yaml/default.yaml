@@ -6,7 +6,7 @@ description: |-
 # define carla simulation setting
 world:
   sync_mode: true
-  client_port: 2000
+  client_port: 4000
   fixed_delta_seconds: 0.05
   seed: 11 # seed for numpy and random
   weather:

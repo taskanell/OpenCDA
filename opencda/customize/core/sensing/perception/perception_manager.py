@@ -44,6 +44,105 @@ class LDMObject:
         self.heading = heading
 
 
+class RadarSensor:
+    """
+    Radar manager for vehicle or infrastructure.
+
+    Parameters
+    ----------
+    vehicle : carla.Vehicle
+        The carla.Vehicle, this is for cav.
+
+    world : carla.World
+        The carla world object, this is for rsu.
+
+    global_position : list
+        Global position of the infrastructure, [x, y, z]
+
+    relative_position : list
+        Indicates the sensor position relative to vehicle or infrastructure,
+        [x, y, z, yaw].
+
+    Attributes
+    ----------
+    detections : list
+        Current list of detected objects.
+    sensor : carla.Sensor
+        The carla sensor that mounts at the vehicle.
+
+    """
+
+    def __init__(self, vehicle, world, global_position=None):
+        if vehicle is not None:
+            world = vehicle.get_world()
+
+        blueprint = world.get_blueprint_library().find('sensor.other.radar')
+        blueprint.set_attribute('horizontal_fov', '30')
+        blueprint.set_attribute('vertical_fov', '30')
+        blueprint.set_attribute('range', '100')
+
+        # spawn sensor
+        if global_position is None:
+            spawn_point = carla.Transform(carla.Location(x=-0.5, z=1.9))
+        else:
+            spawn_point = carla.Transform(carla.Location(x=global_position[0],
+                                                         y=global_position[1],
+                                                         z=global_position[2]))
+
+        if vehicle is not None:
+            self.sensor = world.spawn_actor(blueprint, spawn_point, attach_to=vehicle)
+        else:
+            self.sensor = world.spawn_actor(blueprint, spawn_point)
+
+        self.detections = []
+        weak_self = weakref.ref(self)
+        self.sensor.listen(lambda event: RadarSensor._on_radar_event(weak_self, event))
+
+    @staticmethod
+    def spawn_point_estimation(relative_position, global_position=None):
+        pitch = 0
+        carla_location = carla.Location(x=0, y=0, z=0)
+        x, y, z, yaw = relative_position
+
+        # this is for rsu. It utilizes global position instead of relative
+        # position to the vehicle
+        if global_position is not None:
+            carla_location = carla.Location(
+                x=global_position[0],
+                y=global_position[1],
+                z=global_position[2]
+            )
+            pitch = -35
+
+        carla_location = carla.Location(
+            x=carla_location.x + x,
+            y=carla_location.y + y,
+            z=carla_location.z + z
+        )
+
+        carla_rotation = carla.Rotation(roll=0, yaw=yaw, pitch=pitch)
+        spawn_point = carla.Transform(carla_location, carla_rotation)
+
+        return spawn_point
+
+    @staticmethod
+    def _on_radar_event(weak_self, event):
+        """Callback method for when radar data is received from the sensor."""
+        self = weak_self()
+        if not self:
+            return
+
+        self.detections = []
+        for detection in event:
+            detection_data = {
+                'velocity': detection.velocity,
+                'azimuth': detection.azimuth,
+                'altitude': detection.altitude,
+                'depth': detection.depth
+            }
+            self.detections.append(detection_data)
+
+
 class ExtendedPerceptionManager(PerceptionManager):
     """
     Default perception module. Currenly only used to detect vehicles.
@@ -88,6 +187,7 @@ class ExtendedPerceptionManager(PerceptionManager):
                                                         infra_id)
         self.LDM = {}
         self.steps = 0
+        self.radar = RadarSensor(vehicle, self.carla_world, self.global_position)
 
     def dist(self, a):
         """

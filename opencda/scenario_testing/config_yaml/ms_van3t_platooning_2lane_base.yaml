@@ -1,73 +1,6 @@
-#carla_traffic_manager:
-#  global_distance: 4.0
-#  global_speed_perc: -50
-#  ignore_lights_percentage: 0
-#  vehicle_list:
-#  - spawn_position:
-#    - -403
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -417
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -380
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -365
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -350
-#    - 30
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -380
-#    - 34
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -350
-#    - 34
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
-#  - spawn_position:
-#    - -400
-#    - 27
-#    - 0.3
-#    - 0
-#    - 0
-#    - 0
-#    vehicle_speed_perc: -200
 
+
+# First define the basic parameters of the vehicles
 vehicle_base:
   sensing:
     perception:
@@ -102,78 +35,72 @@ vehicle_base:
     overtake_allowed: false # whether overtake allowed, typically false for platoon leader
     collision_time_ahead: 1.1 # used for collision checking
 
-platoon_base:
-  max_capacity: 10
-  inter_gap: 0.2 # desired time gap
-  open_gap: 1.0 # open gap
-  warm_up_speed: 30 # required speed before cooperative merging
-
 
 scenario:
   background_traffic:
     vehicle_num: 0
-  single_cav_list: # this is for merging vehicle or single cav without v2x
-#    - name: cav1
-#      spawn_position: [-313, 34, 0.3, 0, 0, 0]
-#      destination: [340, 34, 0]
-#      sensing:
-#        perception:
-#          activate: false
-#          camera:
-#            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
-#            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
-#            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
-#            positions:
-#              - [2.5, 0, 1.0, 0]
-#              - [0.0, 0.3, 1.8, 100]
-#              - [0.0, -0.3, 1.8, -100]
-#              - [-2.0, 0.0, 1.5, 180]
-#          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-#            visualize: false
-#      v2x:
-#        communication_range: 35
-#        ms-van3t: true
-#      behavior:
-#        <<: *base_behavior
-#        max_speed: 70 # maximum speed, km/h
-#        tailgate_speed: 111
-#        overtake_allowed: false
-#        local_planner:
-#          debug_trajectory: true
-#          debug: false
-#
-#    - name: cav2
-#      spawn_position: [-323, 34, 0.3, 0, 0, 0]
-#      destination: [340, 34, 0]
-#      sensing:
-#        perception:
-#          activate: false
-#          camera:
-#            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
-#            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
-#            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
-#            positions:
-#              - [2.5, 0, 1.0, 0]
-#              - [0.0, 0.3, 1.8, 100]
-#              - [0.0, -0.3, 1.8, -100]
-#              - [-2.0, 0.0, 1.5, 180]
-#          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-#            visualize: false
-#      v2x:
-#        communication_range: 35
-#        ms-van3t: true
-#      behavior:
-#        <<: *base_behavior
-#        max_speed: 100 # maximum speed, km/h
-#        tailgate_speed: 111
-#        overtake_allowed: true
-#        local_planner:
-#          debug_trajectory: true
-#          debug: false
+  single_cav_list:
+    - name: cav1
+      spawn_position: [-540.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
+      sensing:
+        perception:
+          activate: false
+          camera:
+            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions:
+              - [2.5, 0, 1.0, 0]
+              - [0.0, 0.3, 1.8, 100]
+              - [0.0, -0.3, 1.8, -100]
+              - [-2.0, 0.0, 1.5, 180]
+          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+            visualize: false
+      v2x:
+        communication_range: 35
+        ms-van3t: true
+      behavior:
+        <<: *base_behavior
+        max_speed: 70 # maximum speed, km/h
+        tailgate_speed: 111
+        overtake_allowed: false
+        local_planner:
+          debug_trajectory: true
+          debug: false
+
+    - name: cav2
+      spawn_position: [-550.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
+      sensing:
+        perception:
+          activate: false
+          camera:
+            visualize: 0 # how many camera images need to be visualized. 0 means no visualization for camera
+            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions:
+              - [2.5, 0, 1.0, 0]
+              - [0.0, 0.3, 1.8, 100]
+              - [0.0, -0.3, 1.8, -100]
+              - [-2.0, 0.0, 1.5, 180]
+          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+            visualize: false
+      v2x:
+        communication_range: 35
+        ms-van3t: true
+      behavior:
+        <<: *base_behavior
+        max_speed: 100 # maximum speed, km/h
+        tailgate_speed: 111
+        overtake_allowed: true
+        local_planner:
+          debug_trajectory: true
+          debug: false
 
     - name: cav3
-      spawn_position: [-333, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [-560.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
       sensing:
         perception:
           activate: false
@@ -201,8 +128,8 @@ scenario:
           debug: false
 
     - name: cav4
-      spawn_position: [-343, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [-570.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
       sensing:
         perception:
           activate: false
@@ -229,8 +156,8 @@ scenario:
           debug_trajectory: true
           debug: false
     - name: cav5
-      spawn_position: [-353, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [-580.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
       sensing:
         perception:
           activate: false
@@ -258,8 +185,8 @@ scenario:
           debug: false
 
     - name: cav6
-      spawn_position: [-363, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [-590.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
       sensing:
         perception:
           activate: false
@@ -287,8 +214,8 @@ scenario:
           debug: false
 
     - name: cav7
-      spawn_position: [-373, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [-600.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
       sensing:
         perception:
           activate: false
@@ -316,8 +243,8 @@ scenario:
           debug: false
 
     - name: cav8
-      spawn_position: [-383, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [-610.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
       sensing:
         perception:
           activate: false
@@ -345,8 +272,8 @@ scenario:
           debug: false
 
     - name: cav9
-      spawn_position: [-393, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [-620.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
       sensing:
         perception:
           activate: false
@@ -374,8 +301,8 @@ scenario:
           debug: false
 
     - name: cav10
-      spawn_position: [-403, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [-630.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
       sensing:
         perception:
           activate: false
@@ -403,8 +330,8 @@ scenario:
           debug: false
 
     - name: cav11
-      spawn_position: [-413, 34, 0.3, 0, 0, 0]
-      destination: [340, 34, 0]
+      spawn_position: [-640.722836, 8.3, 0.3, 0, 0, 0]
+      destination: [1100.372955, 8.3, 0.3]
       sensing:
         perception:
           activate: false

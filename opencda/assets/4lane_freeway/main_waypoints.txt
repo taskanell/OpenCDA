@@ -1,0 +1,9 @@
+Waypoint(Transform(Location(x=0.000000, y=-498.399994, z=0.000000), Rotation(pitch=0.000000, yaw=-0.000000, roll=0.000000)))
+
+Waypoint(Transform(Location(x=0.000000, y=-495.200012, z=0.000000), Rotation(pitch=0.000000, yaw=-0.000000, roll=0.000000)))
+
+Waypoint(Transform(Location(x=0.000000, y=-492.000000, z=0.000000), Rotation(pitch=0.000000, yaw=-0.000000, roll=0.000000)))
+
+Waypoint(Transform(Location(x=0.000000, y=-488.799988, z=0.000000), Rotation(pitch=0.000000, yaw=-0.000000, roll=0.000000)))
+
+Waypoint(Transform(Location(x=1200.000000, y=-485.600006, z=0.000000), Rotation(pitch=0.000000, yaw=-0.000000, roll=0.000000)))

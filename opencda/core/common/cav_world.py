@@ -36,7 +36,7 @@ class CavWorld(object):
         The machine learning manager class.
     """
 
-    def __init__(self, apply_ml=False):
+    def __init__(self, apply_ml=False, gpu=0):
 
         self.vehicle_id_set = set()
         self._vehicle_manager_dict = {}
@@ -50,7 +50,7 @@ class CavWorld(object):
             ml_manager = getattr(importlib.import_module(
                 "opencda.customize.ml_libs.ml_manager"), 'MLManager')
             # initialize the ml manager to load the DL/ML models into memory
-            self.ml_manager = ml_manager()
+            self.ml_manager = ml_manager(gpu)
 
         # this is used only when co-simulation activated.
         self.sumo2carla_ids = {}

@@ -33,6 +33,18 @@ def arg_parse():
     parser.add_argument('-v', "--version", type=str, default='0.9.11',
                         help='Specify the CARLA simulator version, default'
                              'is 0.9.11, 0.9.12 is also supported.')
+    parser.add_argument('-g', "--gpu", type=int, default=0,
+                        help='Specify the GPU id to use, default is 0.')
+    parser.add_argument('-s', "--host", type=str, default='localhost',
+                        help='Specify the CARLA host ip to connect to, default is localhost.')
+    parser.add_argument('-p', "--port", type=int, default=2000,
+                        help='Specify the CARLA port to connect to, default is 2000.')
+
+    parser.add_argument('-r', "--grpc_port", type=int, default=1337,
+                        help='Specify the CARLA grpc port to connect to, default is 1337.')
+    parser.add_argument('-tm', "--tm_port", type=int, default=8000,
+                        help='Specify the CARLA traffic manager port to connect to, default is 8000.')
+    parser.add_argument('-w', "--pldm" , type=bool, default=False, help='Whether to use the P-LDM')
     # parse the arguments and return the result
     opt = parser.parse_args()
     return opt

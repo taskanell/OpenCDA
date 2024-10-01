@@ -113,7 +113,10 @@ class LDM(object):
                     self.appendObject(obj, ldm_ids[matchedObj[0]])
                     continue
             # we are detecting a new object
-            newID = self.LDM_ids.pop()
+            # newID = self.LDM_ids.pop()
+            newID = obj.id
+            if obj.id ==1:
+                print('newID:', newID)
             self.LDM[newID] = newLDMentry(obj, newID, detected=True, onSight=True)
             self.LDM[newID].kalman_filter = PO_kalman_filter()
             self.LDM[newID].kalman_filter.init_step(obj.xPosition,
@@ -224,7 +227,34 @@ class LDM(object):
         obj.ySpeed = vy
         obj.xacc = ax
         obj.yacc = ay
+        # obj.confidence = self.computeGT_accuracy(obj, id)
         self.LDM[id].insertPerception(obj)
+
+
+    def computeGT_accuracy(self, object, id):
+        # compute the IoU between the ground truth and the object
+        IoU = 0.0
+        world = self.cav.map_manager.world
+        # create dictionary with all the vehicles in the world
+        vehicle_list = {}
+        for actor in world.get_actors().filter("*vehicle*"):
+            id_x = actor.id
+            vehicle_list[id_x] = actor
+
+        if id in vehicle_list:
+            gt = vehicle_list[id]
+            gt_bbx, gt_line_set = get_o3d_bbx(self.cav, gt.get_location().x, gt.get_location().y, gt.bounding_box.extent.x * 2,
+                                              gt.bounding_box.extent.y * 2, gt.get_transform().rotation.yaw)
+
+            iou = compute_IoU(gt_bbx, object.o3d_bbx)
+            try:
+                iou = compute_IoU_lineSet(gt_line_set, object.line_set)
+            except RuntimeError as e:
+                # print("Unable to compute the oriented bounding box:", e)
+                pass
+            if iou > 0.0:
+                IoU = iou
+        return IoU
 
     def cleanDuplicates(self):
         # simpleLDM = self.getLDM()
@@ -360,9 +390,11 @@ class LDM(object):
                     (CPMobj.yPosition - ego_pos.location.y), 2))
             if dist < 3:
                 continue
-            newID = self.LDM_ids.pop()
+            # newID = self.LDM_ids.pop() # TODO: solve ms-van3t api resulting in changing POids from same cav
+            newID = CPMobj.id
             self.LDM[newID] = newLDMentry(CPMobj, newID, detected=True, onSight=False)
             self.LDM[newID].CPM = True
+            self.LDM[newID].perceivedBy.append(fromID)
             self.LDM[newID].kalman_filter = PO_kalman_filter()
             self.LDM[newID].kalman_filter.init_step(CPMobj.xPosition,
                                                     CPMobj.yPosition,

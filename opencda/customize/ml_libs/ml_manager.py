@@ -12,6 +12,9 @@ here we have this class to enable different CAVs share the same model to
 import cv2
 import torch
 import numpy as np
+import os
+
+
 
 
 class MLManager(object):
@@ -24,9 +27,16 @@ class MLManager(object):
 
     """
 
-    def __init__(self):
+    def __init__(self, gpu_id=0):
 
-        self.object_detector = torch.hub.load('ultralytics/yolov5', 'yolov5m')
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
+        self.device = torch.device(
+            'cuda:{}'.format(gpu_id) if torch.cuda.is_available() else 'cpu')
+        print ("Using device: ", os.environ["CUDA_VISIBLE_DEVICES"])
+        torch.cuda.set_device(self.device)
+        # self.object_detector = torch.hub.load('ultralytics/yolov5', 'yolov5m').to(self.device)
+        self.object_detector = torch.hub.load('ultralytics/yolov5', 'yolov5s', device=self.device).to(self.device)
 
     def draw_2d_box(self, result, rgb_image, index):
         """

@@ -14,6 +14,7 @@ import carla
 import cv2
 import numpy as np
 import open3d as o3d
+import random
 
 import opencda.core.sensing.perception.sensor_transformation as st
 from opencda.core.common.misc import \
@@ -24,7 +25,7 @@ from opencda.core.sensing.perception.static_obstacle import TrafficLight
 from opencda.core.sensing.perception.o3d_lidar_libs import \
     o3d_visualizer_init, o3d_pointcloud_encode, o3d_visualizer_show, \
     o3d_camera_lidar_fusion
-
+from sklearn.cluster import DBSCAN
 
 class CameraSensor:
     """
@@ -324,6 +325,105 @@ class SemanticLidarSensor:
         self.timestamp = event.timestamp
 
 
+class RadarSensor:
+    """
+    Radar manager for vehicle or infrastructure.
+
+    Parameters
+    ----------
+    vehicle : carla.Vehicle
+        The carla.Vehicle, this is for cav.
+
+    world : carla.World
+        The carla world object, this is for rsu.
+
+    global_position : list
+        Global position of the infrastructure, [x, y, z]
+
+    relative_position : list
+        Indicates the sensor position relative to vehicle or infrastructure,
+        [x, y, z, yaw].
+
+    Attributes
+    ----------
+    detections : list
+        Current list of detected objects.
+    sensor : carla.Sensor
+        The carla sensor that mounts at the vehicle.
+
+    """
+
+    def __init__(self, vehicle, world, global_position=None):
+        if vehicle is not None:
+            world = vehicle.get_world()
+
+        blueprint = world.get_blueprint_library().find('sensor.other.radar')
+        blueprint.set_attribute('horizontal_fov', '30')
+        blueprint.set_attribute('vertical_fov', '30')
+        blueprint.set_attribute('range', '100')
+
+        # spawn sensor
+        if global_position is None:
+            spawn_point = carla.Transform(carla.Location(x=-0.5, z=1.9))
+        else:
+            spawn_point = carla.Transform(carla.Location(x=global_position[0],
+                                                         y=global_position[1],
+                                                         z=global_position[2]))
+
+        if vehicle is not None:
+            self.sensor = world.spawn_actor(blueprint, spawn_point, attach_to=vehicle)
+        else:
+            self.sensor = world.spawn_actor(blueprint, spawn_point)
+
+        self.detections = []
+        weak_self = weakref.ref(self)
+        self.sensor.listen(lambda event: RadarSensor._on_radar_event(weak_self, event))
+
+    @staticmethod
+    def spawn_point_estimation(relative_position, global_position=None):
+        pitch = 0
+        carla_location = carla.Location(x=0, y=0, z=0)
+        x, y, z, yaw = relative_position
+
+        # this is for rsu. It utilizes global position instead of relative
+        # position to the vehicle
+        if global_position is not None:
+            carla_location = carla.Location(
+                x=global_position[0],
+                y=global_position[1],
+                z=global_position[2]
+            )
+            pitch = -35
+
+        carla_location = carla.Location(
+            x=carla_location.x + x,
+            y=carla_location.y + y,
+            z=carla_location.z + z
+        )
+
+        carla_rotation = carla.Rotation(roll=0, yaw=yaw, pitch=pitch)
+        spawn_point = carla.Transform(carla_location, carla_rotation)
+
+        return spawn_point
+
+    @staticmethod
+    def _on_radar_event(weak_self, event):
+        """Callback method for when radar data is received from the sensor."""
+        self = weak_self()
+        if not self:
+            return
+
+        self.detections = []
+        for detection in event:
+            detection_data = {
+                'velocity': detection.velocity,
+                'azimuth': detection.azimuth,
+                'altitude': detection.altitude,
+                'depth': detection.depth
+            }
+            self.detections.append(detection_data)
+
+
 class PerceptionManager:
     """
     Default perception module. Currenly only used to detect vehicles.
@@ -414,6 +514,8 @@ class PerceptionManager:
         else:
             self.o3d_vis = None
 
+        self.radar = RadarSensor(vehicle, self.carla_world, self.global_position)
+
         # if data dump is true, semantic lidar is also spawned
         self.data_dump = data_dump
         if data_dump:
@@ -480,6 +582,124 @@ class PerceptionManager:
 
         return objects
 
+    def radar_detect(self, objects):
+
+        velocity_range = 7.5  # m/s
+        current_rot = self.radar.sensor.get_transform().rotation
+
+        # Step 1: Extract 3D Points
+        points = []
+        for detect in self.radar.detections:
+            azi = math.degrees(detect['azimuth'])
+            alt = math.degrees(detect['altitude'])
+            fw_vec = carla.Vector3D(x=detect['depth'] - 0.25)
+            carla.Transform(
+                carla.Location(),
+                carla.Rotation(
+                    pitch=current_rot.pitch + alt,
+                    yaw=current_rot.yaw + azi,
+                    roll=current_rot.roll)).transform(fw_vec)
+            # point = self.radar.sensor.get_transform().location + fw_vec
+            point = fw_vec
+            points.append([point.x, point.y, point.z, detect['velocity']])
+
+        if not points:
+            return  # No points to process
+
+        # Convert to numpy array
+        points_np = np.array(points)
+
+        # Step 2: Cluster the Points
+        clustering = DBSCAN(eps=2.0, min_samples=7).fit(points_np)
+        labels = clustering.labels_
+
+        # Step 3: Generate Colors for Each Cluster
+        unique_labels = set(labels)
+        colors = {}
+        for label in unique_labels:
+            if label == -1:  # Noise points
+                colors[label] = (255, 255, 255)  # White
+            if label == 0:
+                colors[label] = (255, 0, 0)
+            if label == 1:
+                colors[label] = (0, 255, 0)
+            if label == 2:
+                colors[label] = (0, 0, 255)
+
+        # Step 4: Draw the Points with Cluster Colors
+        for point, label in zip(points, labels):
+            #point = point + self.radar.sensor.get_transform().location
+            point[0] = point[0] + self.radar.sensor.get_transform().location.x
+            point[1] = point[1] + self.radar.sensor.get_transform().location.y
+            point[2] = point[2] + self.radar.sensor.get_transform().location.z
+            if point[2] < 0.5 or point[2] > 2.5 or point[3] < (5 - self.vehicle.get_velocity().x) or label == -1:
+                continue
+            # This messes up the yolo detection
+            #r, g, b = colors[label]
+            # self.carla_world.debug.draw_point(
+            #     carla.Location(x=point[0], y=point[1], z=point[2]),
+            #     size=0.075,
+            #     life_time=0.1,
+            #     persistent_lines=False,
+            #     color=carla.Color(r, g, b))
+
+        world = self.carla_world
+        vehicle_list = world.get_actors().filter("*vehicle*")
+        vehicle_list = [v for v in vehicle_list if self.dist(v) < 50 and
+                        v.id != self.id]
+
+
+        # Step 5: Create and Draw Bounding Boxes
+        for label in unique_labels:
+            if label == -1:
+                continue  # Skip noise points
+
+            cluster_points = points_np[labels == label]
+            # skip points with point[0] < 0.5 or point[0] > 2.5 or point[3] < (5 - self.vehicle.get_velocity().x)
+            cluster_points = cluster_points[cluster_points[:, 3] > (5 - self.vehicle.get_velocity().x)]
+
+            if len(cluster_points) == 0:
+                continue
+
+            min_coords = cluster_points.min(axis=0)
+            max_coords = cluster_points.max(axis=0)
+
+            # Create Open3D AxisAlignedBoundingBox
+            o3d_bbx = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_coords[:3], max_bound=max_coords[:3])
+
+            # Create the 8 corners of the bounding box
+            bbox_corners = [
+                [min_coords[0], min_coords[1], min_coords[2]],
+                [min_coords[0], min_coords[1], max_coords[2]],
+                [min_coords[0], max_coords[1], min_coords[2]],
+                [min_coords[0], max_coords[1], max_coords[2]],
+                [max_coords[0], min_coords[1], min_coords[2]],
+                [max_coords[0], min_coords[1], max_coords[2]],
+                [max_coords[0], max_coords[1], min_coords[2]],
+                [max_coords[0], max_coords[1], max_coords[2]],
+            ]
+
+            bbox_corners = np.array(bbox_corners)
+            bbox_corners[:, 0] += self.radar.sensor.get_transform().location.x
+            bbox_corners[:, 1] += self.radar.sensor.get_transform().location.y
+            bbox_corners[:, 2] += self.radar.sensor.get_transform().location.z
+
+            obstacle_vehicle = ObstacleVehicle(bbox_corners, o3d_bbx, confidence=0.71)
+            obstacle_vehicle.set_velocity(
+                 carla.Vector3D(self.vehicle.get_velocity().x + cluster_points.mean(axis=0)[3], 0, 0))
+
+            for v in vehicle_list:
+                loc = v.get_location()
+                obstacle_loc = obstacle_vehicle.get_location()
+                if abs(loc.x - obstacle_loc.x) <= 3.0 and \
+                    abs(loc.y - obstacle_loc.y) <= 3.0:
+                    obstacle_vehicle.carla_id = v.id
+
+            objects['vehicles'].append(obstacle_vehicle)
+
+        return objects
+
+
     def activate_mode(self, objects):
         """
         Use Yolov5 + Lidar fusion to detect objects.
@@ -507,8 +727,12 @@ class PerceptionManager:
                         rgb_camera.image),
                     cv2.COLOR_BGR2RGB))
 
+
         # yolo detection
+        init = time.time_ns()
         yolo_detection = self.ml_manager.object_detector(rgb_images)
+        yolo_time = time.time_ns()
+        #print('yolo detection time [ms]: ' + str((yolo_time - init) / 1e6))
         # rgb_images for drawing
         rgb_draw_images = []
 
@@ -520,6 +744,10 @@ class PerceptionManager:
                 self.lidar.sensor,
                 rgb_camera.sensor, data_copy, np.array(
                     rgb_camera.image))
+
+            rgb_image, projected_radar = st.project_radar_to_camera(
+                self.radar.sensor, rgb_camera.sensor, self.radar.detections, np.array(rgb_image))
+
             rgb_draw_images.append(rgb_image)
 
             # camera lidar fusion
@@ -535,6 +763,11 @@ class PerceptionManager:
             # directly.
             self.speed_retrieve(objects)
 
+        self.radar_detect(objects)
+
+
+        fusion_time = time.time_ns()
+        #print('fusion time [ms]: ' + str((fusion_time - yolo_time) / 1e6))
         if self.camera_visualize:
             for (i, rgb_image) in enumerate(rgb_draw_images):
                 if i > self.camera_num - 1 or i > self.camera_visualize - 1:
@@ -579,6 +812,7 @@ class PerceptionManager:
         objects = self.retrieve_traffic_lights(objects)
         self.objects = objects
 
+        #print('Matching time [ms]: ' + str((time.time_ns() - fusion_time) / 1e6))
         return objects
 
     def deactivate_mode(self, objects):

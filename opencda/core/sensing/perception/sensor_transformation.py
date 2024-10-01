@@ -5,6 +5,8 @@ This script contains the transformations between world and different sensors.
 # Author: Runsheng Xu <rxx3386@ucla.edu>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
+import math
+import carla
 import numpy as np
 from matplotlib import cm
 
@@ -427,5 +429,82 @@ def project_lidar_to_camera(lidar, camera, point_cloud, rgb_image):
     for i in range(len(new_points_2d)):
         rgb_image[v_coord[i] - 1: v_coord[i] + 1,
                   u_coord[i] - 1: u_coord[i] + 1] = color_map[i]
+
+    return rgb_image, points_2d
+
+def project_radar_to_camera(radar, camera, radar_detections, rgb_image):
+    points = []
+    current_rot = radar.get_transform().rotation
+    for detect in radar_detections:
+        azi = math.degrees(detect['azimuth'])
+        alt = math.degrees(detect['altitude'])
+        fw_vec = carla.Vector3D(x=detect['depth'] - 0.25)
+        carla.Transform(
+            carla.Location(),
+            carla.Rotation(
+                pitch=current_rot.pitch + alt,
+                yaw=current_rot.yaw + azi,
+                roll=current_rot.roll)).transform(fw_vec)
+        point = fw_vec
+        points.append([point.x, point.y, point.z, 1])
+
+    if not points:
+        return rgb_image, np.array([])  # No points to process
+    # Convert to numpy array
+    points_np = np.array(points)
+
+    # Step 2: Transform Points to World Space
+    points_np_homogeneous = np.r_[
+        points_np[:, :3].T, [np.ones(points_np.shape[0])]]
+    radar_2_world = x_to_world_transformation(radar.get_transform())
+    world_points = np.dot(radar_2_world, points_np_homogeneous)
+
+    # Step 3: Transform World Points to Camera Space
+    sensor_points = world_to_sensor(world_points, camera.get_transform())
+
+    # Step 4: Convert to Standard Camera Coordinates
+    point_in_camera_coords = np.array([
+        sensor_points[1],
+        sensor_points[2] * -1,
+        sensor_points[0]])
+
+    # Retrieve camera intrinsic
+    K = get_camera_intrinsic(camera)
+
+    points_2d = np.dot(K, point_in_camera_coords)
+    points_2d = np.array([
+        points_2d[0, :] / points_2d[2, :],
+        points_2d[1, :] / points_2d[2, :],
+        points_2d[2, :]])
+
+    image_w = int(camera.attributes['image_size_x'])
+    image_h = int(camera.attributes['image_size_y'])
+
+    # Step 6: Filter Points Outside Image Bounds
+    points_2d = points_2d.T
+    intensity = np.ones(points_np.shape[0])
+    points_in_canvas_mask = \
+        (points_2d[:, 0] > 0.0) & (points_2d[:, 0] < image_w) & \
+        (points_2d[:, 1] > 0.0) & (points_2d[:, 1] < image_h) & \
+        (points_2d[:, 2] > 0.0)
+    new_points_2d = points_2d[points_in_canvas_mask]
+    new_intensity = intensity[points_in_canvas_mask]
+
+    # Extract the screen coords (uv) as integers
+    u_coord = new_points_2d[:, 0].astype(np.int)
+    v_coord = new_points_2d[:, 1].astype(np.int)
+
+    # Map intensities to shades of red
+    new_intensity = np.clip(new_intensity, 0, 1)  # Ensure intensity is in the range [0, 1]
+    color_map = np.array([
+        np.zeros_like(new_intensity),
+        np.zeros_like(new_intensity),
+        255 * new_intensity
+    ]).astype(np.int).T
+
+    # Step 7: Draw Points on the Image
+    for i in range(len(new_points_2d)):
+        rgb_image[v_coord[i] - 1: v_coord[i] + 1,
+        u_coord[i] - 1: u_coord[i] + 1] = color_map[i]
 
     return rgb_image, points_2d
