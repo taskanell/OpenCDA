@@ -224,43 +224,34 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
         for object_ in object_list:
             if object_.perception.line_set is not None:
                 geometry = object_.perception.line_set
-                if not object_.tracked:
-                    continue
-                if object_.detected and object_.onSight:
-                    if object_.CPM:
-                        colors = [[1, 0.6, 0] for _ in range(12)]
-                        geometry.colors = o3d.utility.Vector3dVector(colors)
-                    else:
-                        colors = [[1, 0, 0] for _ in range(12)]
-                        geometry.colors = o3d.utility.Vector3dVector(colors)
-                elif not object_.detected:
+                if object_.connected:
                     colors = [[0, 1, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
-                elif object_.CPM:
-                    colors = [[1, 1, 0] for _ in range(12)]
-                    geometry.colors = o3d.utility.Vector3dVector(colors)
-                elif isinstance(object_, PLDMentry) and object_.assignedPM is not None:
+                elif not object_.connected and object_.onSight and object_.tracked:
                     colors = [[1, 0, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
-                else:
-                    colors = [[0.5, 0, 0] for _ in range(12)]
+                elif not object_.connected and not object_.onSight and object_.CPM:
+                    colors = [[1, 0.6, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
+                elif not object_.connected and not object_.onSight and object_.tracked:
+                    colors = [[0.7, 0, 0] for _ in range(12)]
+                    geometry.colors = o3d.utility.Vector3dVector(colors)
+                else:
+                    continue
             else:
                 geometry = object_.perception.o3d_bbx
-                if not object_.tracked:
-                    continue
-                if object_.detected and object_.onSight:
-                    geometry.color = (1, 0, 0)
-                elif not object_.detected:
+                if object_.connected:
                     geometry.color = (0, 1, 0)
-                elif object_.CPM:
-                    geometry.color = (0.7, 0, 0)
-                elif isinstance(object_, PLDMentry) and object_.assignedPM is not None:
+                elif not object_.connected and object_.onSight and object_.tracked:
                     geometry.color = (1, 0, 0)
-                else:
+                elif not object_.connected and not object_.onSight and object_.CPM:
+                    geometry.color = (1, 0.6, 0)
+                elif not object_.connected and object_.tracked:
                     geometry.color = (0.5, 0, 0)
-            vis.add_geometry(geometry)
+                else:
+                    continue
 
+            vis.add_geometry(geometry)
             LDM_geometries.append(geometry)
 
     # vis.add_geometry(test_rotation())

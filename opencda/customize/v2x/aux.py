@@ -2,11 +2,11 @@ from collections import deque
 import copy
 
 
-def newLDMentry(perception, id, detected=True, onSight=True):
+def newLDMentry(perception, id, connected=False, onSight=True):
     # Function to create a new LDMentry from a perception
     retEntry = LDMentry(id, perception.xPosition, perception.yPosition, perception.width, perception.length,
                         perception.timestamp, perception.confidence, xSpeed=perception.xSpeed, ySpeed=perception.ySpeed,
-                        heading=perception.heading, detected=detected, o3d_bbx=perception.o3d_bbx, onSight=True)
+                        heading=perception.heading, connected=connected, o3d_bbx=perception.o3d_bbx, onSight=True)
     retEntry.insertPerception(retEntry.perception)
     return retEntry
 
@@ -23,27 +23,28 @@ def newPLDMentry(perception, id, detected=True, onSight=True):
 
 class LDMentry:
     def __init__(self, id, xPosition, yPosition, width, length, timestamp, confidence, xSpeed=0, ySpeed=0, heading=0,
-                 detected=True, o3d_bbx=None, onSight=True):
+                 connected=False, o3d_bbx=None, onSight=True):
         self.perception = Perception(xPosition, yPosition, width, length, timestamp, confidence,
                                      xSpeed=xSpeed, ySpeed=ySpeed, heading=heading, o3d_bbx=o3d_bbx)
-        self.perception.detected = detected
+        self.perception.connected = connected
         self.pathHistory = deque([], maxlen=10)
         self.CPM_lastIncluded = None  # Last included perception on a CPM
         # Metadata
         self.id = id
-        self.detected = detected  # False if this is a CV
+        self.connected = connected  # True if we received a CAM from this vehicle
         self.onSight = onSight  # False if this is obj is not currently on sight
+        self.CPM = False  # True if this object has been perceived from a CPM
         self.perceivedBy = []
         self.kalman_filter = None
         self.tracked = False  # True if this object has been tracked for at least 10 frames
-        self.CPM = False  # True if this object has been perceived from a CPM
+
 
     def insertPerception(self, obj):
         self.perception = obj
         if len(self.pathHistory) >= 10:
             self.pathHistory.popleft()
         self.pathHistory.append(copy.deepcopy(obj))
-        if len(self.pathHistory) == 10 or not self.detected or self.CPM:
+        if len(self.pathHistory) == 10 or self.connected or self.CPM:
             self.tracked = True
 
     def getLatestPoint(self):
@@ -77,6 +78,7 @@ class Perception:
         self.dySpeed = dySpeed
         self.xacc = 0
         self.yacc = 0
+        self.connected = False
         self.fromID = fromID
 
 

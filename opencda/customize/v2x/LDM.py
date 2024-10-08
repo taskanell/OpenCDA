@@ -115,9 +115,9 @@ class LDM(object):
             # we are detecting a new object
             # newID = self.LDM_ids.pop()
             newID = obj.id
-            if obj.id ==1:
+            if obj.id == 1:
                 print('newID:', newID)
-            self.LDM[newID] = newLDMentry(obj, newID, detected=True, onSight=True)
+            self.LDM[newID] = newLDMentry(obj, newID, connected=False, onSight=True)
             self.LDM[newID].kalman_filter = PO_kalman_filter()
             self.LDM[newID].kalman_filter.init_step(obj.xPosition,
                                                     obj.yPosition,
@@ -179,7 +179,7 @@ class LDM(object):
         indices_to_delete = []
         for i in range(len(objects)):
             for j in range(i + 1, len(objects)):
-                if IoU_map[i][j] > 0 and self.LDM[ldm_ids[j]].detected:
+                if IoU_map[i][j] > 0 and not self.LDM[ldm_ids[j]].connected:
                     indices_to_delete.append(j)
         indices_to_delete = list(set(indices_to_delete))
 
@@ -196,7 +196,7 @@ class LDM(object):
         self.LDM[id].onSight = True
         # Compute the estimated heading angle
         obj.heading = obj.yaw
-        if self.LDM[id].detected is False:
+        if self.LDM[id].connected is True:
             # If this entry is of a connected vehicle
             # obj.connected = True  # We do this to take the width and length from CAM always
             obj.width = self.LDM[id].perception.width
@@ -264,11 +264,11 @@ class LDM(object):
             if matchedId != -1:
                 if LDMobj.PLU is True and self.LDM[matchedId].PLU is False:
                     duplicates.append(matchedId)
-                elif LDMobj.detected is True and self.LDM[matchedId].detected is False:
+                elif LDMobj.connected is False and self.LDM[matchedId].connected:
                     duplicates.append(matchedId)
-                elif LDMobj.detected is True and LDMobj.timestamp > self.LDM[matchedId].timestamp:
+                elif LDMobj.connected is False and LDMobj.timestamp > self.LDM[matchedId].timestamp:
                     duplicates.append(matchedId)
-                elif LDMobj.detected is True and \
+                elif LDMobj.connected is False and \
                         (LDMobj.width + LDMobj.length) > (self.LDM[matchedId].width + self.LDM[matchedId].length):
                     duplicates.append(matchedId)
                 elif LDMobj.connected is True:
@@ -295,7 +295,7 @@ class LDM(object):
     def getAllPOs(self):
         POs = []
         for ID, LDMobj in self.LDM.items():
-            if LDMobj.detected:
+            if not LDMobj.connected:
                 POs.append(LDMobj)
         return POs
 
@@ -308,18 +308,20 @@ class LDM(object):
                                                             CAMobject.length,
                                                             CAMobject.yaw)
         if CAMobject.id in self.LDM:
-            # If this is not the first CAM
+            # If this is not the first CAM from this vehicle
             self.LDM[CAMobject.id].kalman_filter.predict(self.cav.get_time_ms())
             x, y, vx, vy, ax, ay = self.LDM[CAMobject.id].kalman_filter.update(CAMobject.xPosition, CAMobject.yPosition,
                                                                                self.cav.get_time_ms())
             # print('KFupdate: ', "x: ", x, ",y: ", y, ",vx: ", vx, ",vy: ", vy, ",ax: ", ax, ",ay: ", ay)
             CAMobject.xPosition = x
             CAMobject.yPosition = y
-            CAMobject.xSpeed = vx
-            CAMobject.ySpeed = vy
+            # We trust the CAM speed
+            # CAMobject.xSpeed = vx
+            # CAMobject.ySpeed = vy
             CAMobject.xacc = ax
             CAMobject.yacc = ay
             self.LDM[CAMobject.id].insertPerception(CAMobject)
+            self.LDM[CAMobject.id].connected = True
         else:
             # If this is the first CAM, check if we are already perceiving it
             IoU_map, new, matched, ldm_ids = self.match_LDM([CAMobject])
@@ -331,7 +333,7 @@ class LDM(object):
             # Create new entry
             if CAMobject.id in self.cav.LDM_ids:
                 self.cav.LDM_ids.remove(CAMobject.id)
-            self.LDM[CAMobject.id] = newLDMentry(CAMobject, CAMobject.id, detected=False, onSight=True)
+            self.LDM[CAMobject.id] = newLDMentry(CAMobject, CAMobject.id, connected=True, onSight=True)
             self.LDM[CAMobject.id].kalman_filter = PO_kalman_filter()
             self.LDM[CAMobject.id].kalman_filter.init_step(CAMobject.xPosition,
                                                            CAMobject.yPosition,
@@ -392,7 +394,7 @@ class LDM(object):
                 continue
             # newID = self.LDM_ids.pop() # TODO: solve ms-van3t api resulting in changing POids from same cav
             newID = CPMobj.id
-            self.LDM[newID] = newLDMentry(CPMobj, newID, detected=True, onSight=False)
+            self.LDM[newID] = newLDMentry(CPMobj, newID, connected=False, onSight=False)
             self.LDM[newID].CPM = True
             self.LDM[newID].perceivedBy.append(fromID)
             self.LDM[newID].kalman_filter = PO_kalman_filter()
@@ -471,7 +473,7 @@ class LDM(object):
                                                             newLDMobj.yaw)
         # cav.LDM[id].kalman_filter.update(newLDMobj.xPosition, newLDMobj.yPosition, newLDMobj.width, newLDMobj.length)
         self.LDM[id].insertPerception(newLDMobj)
-        # self.LDM[id].CPM = True
+        self.LDM[id].CPM = True
 
     def getLDM_tracked(self):
         tracked = {}

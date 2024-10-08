@@ -17,6 +17,8 @@ import csv
 import weakref
 import carla
 
+from opencda.customize.v2x.v2x_agent import V2XAgent
+from opencda.customize.v2x.PLDM import PLDM
 from opencda.customize.v2x.LDM import LDM
 from opencda.customize.v2x.aux import LDMentry
 from opencda.customize.v2x.aux import newLDMentry
@@ -181,10 +183,18 @@ class ExtendedVehicleManager(VehicleManager):
         file_detection = (time.time_ns() / 1000) - file_timestamp
         # ------------------LDM patch------------------------
         self.time = self.map_manager.world.get_snapshot().elapsed_seconds
-        self.ldm_mutex.acquire()
-        self.LDM.updateLDM(self.translateDetections(objects))
-        objects = self.LDM.LDM2OpencdaObj(objects['traffic_lights'])
-        self.ldm_mutex.release()
+        if (self.PLDM is not None) and \
+                (self.v2xAgent.pldmService.recv_plu > 1 or self.v2xAgent.pldmService.leader):
+            # if self.PLDM is not None:
+            self.pldm_mutex.acquire()
+            self.PLDM.updatePLDM(self.translateDetections(objects))
+            objects = self.PLDM.PLDM2OpencdaObj(objects['traffic_lights'])
+            self.pldm_mutex.release()
+        elif not self.pldm:
+            self.ldm_mutex.acquire()
+            self.LDM.updateLDM(self.translateDetections(objects))
+            objects = self.LDM.LDM2OpencdaObj(objects['traffic_lights'])
+            self.ldm_mutex.release()
         file_localFusion = ((time.time_ns() / 1000) - file_detection - file_timestamp)
 
         if self.file:
