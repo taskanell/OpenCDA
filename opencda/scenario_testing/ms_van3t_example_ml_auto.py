@@ -35,7 +35,8 @@ def run_scenario(opt, scenario_params):
                                                    carla_port=opt.port)
 
         single_cav_list = \
-            scenario_manager.create_vehicle_manager(application=['single'])
+            scenario_manager.create_vehicle_manager_auto(application=['single'],
+                                                         port=opt.port)
 
         traffic_manager, bg_veh_list = \
             scenario_manager.create_traffic_carla(port=opt.tm_port)
@@ -67,8 +68,8 @@ def run_scenario(opt, scenario_params):
 
             for i, single_cav in enumerate(single_cav_list):
                 single_cav.update_info_LDM()
-                control = single_cav.run_step()
-                single_cav.vehicle.apply_control(control)
+                # control = single_cav.run_step()
+                # single_cav.vehicle.apply_control(control)
 
             for actor in scenario_manager.world.get_actors().filter("*vehicle*"):
                 location = actor.get_location()

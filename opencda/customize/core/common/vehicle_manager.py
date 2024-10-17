@@ -263,7 +263,10 @@ class ExtendedVehicleManager(VehicleManager):
                                 obj.confidence)
             LDMobj.xSpeed = obj.velocity.x
             LDMobj.ySpeed = obj.velocity.y
-            LDMobj.yaw = obj.yaw
+            # LDMobj.yaw = obj.yaw
+            # TODO: this is a workaround, pose estimation in o3d_pointcloud.get_oriented_bounding_box() is not reliable
+            curr_wpt = self.map_manager.world.get_map().get_waypoint(carla.Location(x=obj.location.x, y=obj.location.y, z=0.0))
+            LDMobj.yaw = curr_wpt.transform.rotation.yaw
             LDMobj.id = obj.carla_id
             returnedObjects.append(LDMobj)
         return {'vehicles': returnedObjects}

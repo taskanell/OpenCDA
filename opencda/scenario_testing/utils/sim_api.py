@@ -411,6 +411,179 @@ class ScenarioManager:
 
         return single_cav_list
 
+    def create_vehicle_manager_auto(self, application,
+                               map_helper=None,
+                               data_dump=False,
+                               pldm=False,
+                               log_dir=None,
+                               port=8000):
+        """
+        Create a list of single CAVs to be controlled by carla's traffic manager.
+
+        Parameters
+        ----------
+        application : list
+            The application purpose, a list, eg. ['single'], ['platoon'].
+
+        map_helper : function
+            A function to help spawn vehicle on a specific position in
+            a specific map.
+
+        data_dump : bool
+            Whether to dump sensor data.
+
+        port : int
+            The port number of the traffic manager.
+
+        Returns
+        -------
+        single_cav_list : list
+            A list contains all single CAVs' vehicle manager.
+        """
+        print('Creating single CAVs.')
+
+        traffic_config = self.scenario_params['carla_traffic_manager']
+        if port != 8000:
+            tm = self.client.get_trafficmanager(port)
+        else:
+            tm = self.client.get_trafficmanager()
+
+        tm.set_global_distance_to_leading_vehicle(
+            traffic_config['global_distance'])
+        tm.set_synchronous_mode(traffic_config['sync_mode'])
+        tm.set_osm_mode(traffic_config['set_osm_mode'])
+        tm.global_percentage_speed_difference(
+            traffic_config['global_speed_perc'])
+        # By default, we use lincoln as our cav model.
+        default_model = 'vehicle.lincoln.mkz2017' \
+            if self.carla_version == '0.9.11' else 'vehicle.lincoln.mkz_2017'
+
+        cav_vehicle_bp = \
+            self.world.get_blueprint_library().find(default_model)
+        single_cav_list = []
+
+        for i, cav_config in enumerate(
+                self.scenario_params['scenario']['single_cav_list']):
+            # in case the cav wants to join a platoon later
+            # it will be empty dictionary for single cav application
+            platoon_base = OmegaConf.create({'platoon': self.scenario_params.get('platoon_base', {})})
+            cav_config = OmegaConf.merge(self.scenario_params['vehicle_base'],
+                                         platoon_base,
+                                         cav_config)
+            # if the spawn position is a single scalar, we need to use map
+            # helper to transfer to spawn transform
+            if 'spawn_special' not in cav_config:
+                spawn_transform = carla.Transform(
+                    carla.Location(
+                        x=cav_config['spawn_position'][0],
+                        y=cav_config['spawn_position'][1],
+                        z=cav_config['spawn_position'][2]),
+                    carla.Rotation(
+                        pitch=cav_config['spawn_position'][5],
+                        yaw=cav_config['spawn_position'][4],
+                        roll=cav_config['spawn_position'][3]))
+            else:
+                # spawn_transform = map_helper(self.carla_version,
+                #                             cav_config['spawn_special'][0])
+                transform_point = carla.Transform(carla.Location(x=-1202.0827,
+                                                                 y=458.2501,
+                                                                 z=0.3),
+                                                  carla.Rotation(yaw=-20.4866))
+
+                begin_point = carla.Transform(carla.Location(x=-16.7102,
+                                                             y=15.3622,
+                                                             z=0.3),
+                                              carla.Rotation(yaw=-20.4866))
+
+                transform_point.location.x = transform_point.location.x + cav_config['spawn_special'][0] * \
+                                             (begin_point.location.x -
+                                              transform_point.location.x)
+                transform_point.location.y = transform_point.location.y + cav_config['spawn_special'][0] * \
+                                             (begin_point.location.y -
+                                              transform_point.location.y)
+                spawn_transform = transform_point
+                # self.world.debug.draw_string(ego_pos.location, str(self.vehicle.id), False, carla.Color(200, 200, 0))
+
+
+            # if 'intruder' in cav_config['v2x']:
+            #     if cav_config['v2x']['intruder']:
+            #         cav_vehicle_bp.set_attribute('color', '255, 0, 0')
+            #         vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+            #
+            #         vehicle_manager = ExtendedVehicleManager(
+            #             vehicle, cav_config, 'intruder',
+            #             self.carla_map, self.cav_world,
+            #             current_time=self.scenario_params['current_time'],
+            #             data_dumping=data_dump,
+            #             pldm=False, log_dir=log_dir)
+            #     else:
+            #         cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+            #         vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+            #         # create vehicle manager for each cav
+            #         vehicle_manager = ExtendedVehicleManager(
+            #             vehicle, cav_config, application,
+            #             self.carla_map, self.cav_world,
+            #             current_time=self.scenario_params['current_time'],
+            #             data_dumping=data_dump,
+            #             pldm=pldm, log_dir=log_dir)
+            if 'ms-van3t' in cav_config['v2x']:
+                cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+                if 'intruder' in cav_config['v2x']:
+                    cav_vehicle_bp.set_attribute('color', '255, 0, 0')
+                # print ('transform:', spawn_transform)
+                vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+                # create vehicle manager for each cav
+                vehicle_manager = ExtendedVehicleManager(
+                    vehicle, cav_config, application,
+                    self.carla_map, self.cav_world,
+                    current_time=self.scenario_params['current_time'],
+                    data_dumping=data_dump,
+                    pldm=pldm, log_dir=log_dir, ms_vanet=True)
+
+                vehicle.set_autopilot(True, tm.get_port())
+                if 'vehicle_speed_perc' in cav_config:
+                    tm.vehicle_percentage_speed_difference(
+                        vehicle, cav_config['vehicle_speed_perc'])
+                tm.auto_lane_change(vehicle, traffic_config['auto_lane_change'])
+                tm.ignore_lights_percentage(vehicle, 0)
+            else:
+                if 'spawn_special' not in cav_config:
+                    cav_vehicle_bp.set_attribute('color', '0, 0, 255')
+                else:
+                    cav_vehicle_bp.set_attribute('color', '255, 0, 0')
+                vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+                # create vehicle manager for each cav
+                vehicle_manager = ExtendedVehicleManager(
+                    vehicle, cav_config, application,
+                    self.carla_map, self.cav_world,
+                    current_time=self.scenario_params['current_time'],
+                    data_dumping=data_dump,
+                    pldm=pldm, log_dir=log_dir)
+
+                vehicle.set_autopilot(True, tm.get_port())
+                if 'vehicle_speed_perc' in cav_config:
+                    tm.vehicle_percentage_speed_difference(
+                        vehicle, cav_config['vehicle_speed_perc'])
+                tm.auto_lane_change(vehicle, traffic_config['auto_lane_change'])
+                tm.ignore_lights_percentage(vehicle, 0)
+
+            self.world.tick()
+
+            vehicle_manager.v2x_manager.set_platoon(None)
+
+            destination = carla.Location(x=cav_config['destination'][0],
+                                         y=cav_config['destination'][1],
+                                         z=cav_config['destination'][2])
+            vehicle_manager.update_info_LDM()
+            vehicle_manager.set_destination(
+                vehicle_manager.vehicle.get_location(),
+                destination,
+                clean=True)
+
+            single_cav_list.append(vehicle_manager)
+
+        return single_cav_list
+
     def create_single_vehicle_manager(self, application,
                                       map_helper=None,
                                       data_dump=False,
