@@ -11,9 +11,11 @@ import importlib
 import os
 import sys
 from omegaconf import OmegaConf
+from configparser import ConfigParser
 
 from opencda.version import __version__
-
+home = os.getenv("HOME") + "/git/driving-simulator/"
+#sys.path.append(home +"git/driving-simulator/")
 
 def arg_parse():
     # create an argument parser
@@ -45,6 +47,11 @@ def arg_parse():
     parser.add_argument('-tm', "--tm_port", type=int, default=8000,
                         help='Specify the CARLA traffic manager port to connect to, default is 8000.')
     parser.add_argument('-w', "--pldm" , type=bool, default=False, help='Whether to use the P-LDM')
+    parser.add_argument('-i', "--ini_config", required=True, type=str,
+                        help='Define the name of the scenario you want to test. The given name must'
+                             'match one of the testing scripts(e.g. single_2lanefree_carla) in '
+                             'opencda/scenario_testing/ folder'
+                             ' as well as the corresponding yaml file in opencda/scenario_testing/config_yaml.')
     # parse the arguments and return the result
     opt = parser.parse_args()
     return opt
@@ -54,6 +61,7 @@ def main():
     # parse the arguments
     opt = arg_parse()
     # print the version of OpenCDA
+    #print('Server ready')
     print("OpenCDA Version: %s" % __version__)
     # set the default yaml file
     default_yaml = config_yaml = os.path.join(
@@ -62,11 +70,26 @@ def main():
     # set the yaml file for the specific testing scenario
     config_yaml = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                'opencda/scenario_testing/config_yaml/%s.yaml' % opt.test_scenario)
+    config_ini = os.path.join(home,'data/config/%s.ini' % opt.ini_config)
+    print("config: ", config_ini)
+    ini_parser = ConfigParser()
+    ini_parser.read(config_ini)
+    ini_dict = {}
+    for section in ini_parser.sections():
+        ini_dict[section] = dict(ini_parser.items(section))
+    print(ini_dict)
+    config_ini = OmegaConf.create(ini_dict)
+    print(config_ini)
     # load the default yaml file and the scenario yaml file as dictionaries
     default_dict = OmegaConf.load(default_yaml)
     scene_dict = OmegaConf.load(config_yaml)
-    # merge the dictionaries
     scene_dict = OmegaConf.merge(default_dict, scene_dict)
+    scene_dict = OmegaConf.merge(scene_dict,config_ini)
+    OmegaConf.save(scene_dict,"/tmp/scene_dict.yaml")
+    print(scene_dict)
+    
+    # merge the dictionaries
+    #scene_dict = OmegaConf.merge(default_dict, scene_dict)
 
     # import the testing script
 

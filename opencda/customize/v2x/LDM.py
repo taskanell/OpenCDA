@@ -46,7 +46,7 @@ class LDM(object):
         self.recvCPMmap = {}
         self.colorGradient = ColorGradient(10)
         if visualize:
-            self.o3d_vis = o3d_visualizer_init(cav.vehicle.id * 10)
+            self.o3d_vis = o3d_visualizer_init(cav.vehicle.id) #* 10)
         # if log:
         #     self.file = '/home/carlos/speed_logs' + str(cav.vehicle.id) + 'LDM.csv'
         #     with open(self.file, 'w', newline='') as logfile:
@@ -75,14 +75,16 @@ class LDM(object):
                     try:
                         iou = compute_IoU_lineSet(LDMpredline_set, object_list[j].line_set)
                     except RuntimeError as e:
-                        # print("Unable to compute the oriented bounding box:", e)
+                        print("Unable to compute the oriented bounding box:", e)
                         pass
-                    if iou > 0:
+                    #if compared objects have diff label have iou -1000
+                    if iou > 0 and LDMobj.perception.label == obj.label:
                         IoU_map[i, j] = iou
-                    elif dist < 3:  # if dist < 3 --> IoU_map[i, j] = 0
+                    elif dist < 3 and LDMobj.perception.label == obj.label:  # if dist < 3 --> IoU_map[i, j] = 0
                         IoU_map[i, j] = dist - 1000
                     else:
                         IoU_map[i, j] = -1000
+                    print(f'IoU value {IoU_map[i, j]} of {obj.id} with {ID} vehicle')
                 i += 1
                 ldm_ids.append(ID)
             matched, new = linear_assignment(-IoU_map)
@@ -108,8 +110,10 @@ class LDM(object):
             obj = object_list['vehicles'][j]
             obj.o3d_bbx, obj.line_set = self.cav.LDMobj_to_o3d_bbx(obj)
             if IoU_map is not None:
+                print (f'IoU map is not None for {obj.id}')
                 matchedObj = matched[np.where(new == j)[0]]
                 if IoU_map[matchedObj, j] != -1000:
+                    print(f"MATCHED OBJECT ID {obj.id}")
                     self.appendObject(obj, ldm_ids[matchedObj[0]])
                     continue
             # we are detecting a new object
@@ -117,6 +121,7 @@ class LDM(object):
             newID = obj.id
             if obj.id == 1:
                 print('newID:', newID)
+            print(f'New ID: {newID}')
             self.LDM[newID] = newLDMentry(obj, newID, connected=False, onSight=True)
             self.LDM[newID].kalman_filter = PO_kalman_filter()
             self.LDM[newID].kalman_filter.init_step(obj.xPosition,
@@ -150,10 +155,13 @@ class LDM(object):
         # LDM visualization in lidar view
         showObjects = self.LDM_to_lidarObjects()
         gt = self.cav.perception_manager.getGTobjects()
+        #for PO in POS = self.getAllPOs()
+        
         if self.cav.perception_manager.lidar:
             while self.cav.perception_manager.lidar.data is None:
                 continue
-            o3d_pointcloud_encode(self.cav.perception_manager.lidar.data,
+            o3d_pointcloud_encode(self.cav.localizer.get_ego_pos(),
+                                  self.cav.perception_manager.lidar.data,
                                   self.cav.perception_manager.lidar.o3d_pointcloud)
             if self.cav.lidar_visualize:
                 o3d_visualizer_showLDM(
@@ -175,6 +183,7 @@ class LDM(object):
 
     def clean_duplicates(self):
         objects = [obj.perception for obj in self.LDM.values()]
+        print('CLEAN DUPLICATES')
         IoU_map, new, matched, ldm_ids = self.match_LDM(objects)
         indices_to_delete = []
         for i in range(len(objects)):
@@ -182,6 +191,7 @@ class LDM(object):
                 if IoU_map[i][j] > 0 and not self.LDM[ldm_ids[j]].connected:
                     indices_to_delete.append(j)
         indices_to_delete = list(set(indices_to_delete))
+        print(indices_to_delete)
 
         for i in indices_to_delete:
             del self.LDM[ldm_ids[i]]
@@ -191,6 +201,7 @@ class LDM(object):
         if self.cav.vehicle.id not in self.LDM[id].perceivedBy:
             self.LDM[id].perceivedBy.append(self.cav.vehicle.id)
         if obj.timestamp < self.LDM[id].getLatestPoint().timestamp:
+            print(f'OLD TIMESTAMP for {obj.id}')
             return
 
         self.LDM[id].onSight = True
@@ -199,6 +210,7 @@ class LDM(object):
         if self.LDM[id].connected is True:
             # If this entry is of a connected vehicle
             # obj.connected = True  # We do this to take the width and length from CAM always
+            print("CONNECTED VEH WITH ID: ", id)
             obj.width = self.LDM[id].perception.width
             obj.length = self.LDM[id].perception.length
             obj.yaw = self.LDM[id].perception.yaw
@@ -359,7 +371,9 @@ class LDM(object):
         # Try to match CPM objects with LDM ones
         # If we match an object, we perform fusion averaging the bbx
         # If can't match the object we append it to the LDM as a new object
+        print (f'Post list: {post_list}')
         for CPMobj in post_list:
+            
             if self.last_update > CPMobj.timestamp:
                 diff = self.last_update - CPMobj.timestamp
                 # If it's an old perception, we need to predict its current position
@@ -375,6 +389,7 @@ class LDM(object):
 
         for j in range(len(post_list)):
             CPMobj = post_list[j]
+            print(f'CPMobj with {CPMobj.id} is here')
             # Compute bbx from cav's POV because we already converted values
             CPMobj.o3d_bbx, CPMobj.line_set = get_o3d_bbx(self.cav, CPMobj.xPosition,
                                                           CPMobj.yPosition,
@@ -391,10 +406,12 @@ class LDM(object):
                 math.pow((CPMobj.xPosition - ego_pos.location.x), 2) + math.pow(
                     (CPMobj.yPosition - ego_pos.location.y), 2))
             if dist < 3:
+                #print(f'CPM OBJ {CPMobj.id} less than 3 distance')
                 continue
             # newID = self.LDM_ids.pop() # TODO: solve ms-van3t api resulting in changing POids from same cav
             newID = CPMobj.id
             self.LDM[newID] = newLDMentry(CPMobj, newID, connected=False, onSight=False)
+            print(f'CPM OBJ {CPMobj.id} HAS CPM FLAG TRUE')
             self.LDM[newID].CPM = True
             self.LDM[newID].perceivedBy.append(fromID)
             self.LDM[newID].kalman_filter = PO_kalman_filter()
@@ -410,6 +427,7 @@ class LDM(object):
         if fromID not in self.LDM[id].perceivedBy:
             self.LDM[id].perceivedBy.append(fromID)
         if CPMobj.timestamp < self.LDM[id].getLatestPoint().timestamp - 100:  # Consider objects up to 100ms old
+            print(f'CPMobj with id {CPMobj} is old')
             return
 
         newLDMobj = Perception(CPMobj.xPosition,
@@ -472,6 +490,7 @@ class LDM(object):
                                                             newLDMobj.length,
                                                             newLDMobj.yaw)
         # cav.LDM[id].kalman_filter.update(newLDMobj.xPosition, newLDMobj.yPosition, newLDMobj.width, newLDMobj.length)
+        print(f'CPMobj with id {CPMobj} in appendCMPobj')
         self.LDM[id].insertPerception(newLDMobj)
         self.LDM[id].CPM = True
 

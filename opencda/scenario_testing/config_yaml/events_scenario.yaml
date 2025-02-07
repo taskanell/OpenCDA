@@ -1,0 +1,99 @@
+description: |-
+  Copyright 2021 <UCLA Mobility Lab>
+  Author: Runsheng Xu <rxx3386@ucla.edu>
+  Content: This is the scenario testing configuration file for single vehicle perception/localization/behavior/control
+           testing in high speed in the customized 2lanefree simple version.
+
+# First define the basic parameters of the vehicles
+vehicle_base:
+  sensing:
+    perception:
+      camera:
+        visualize: 1
+        num: 1 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+        # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+        positions: 
+         - [2.5, 0, 1.0, 0]
+      lidar:
+        visualize: true
+  map_manager:
+    visualize: false
+    activate: false
+  #behavior:
+   # max_speed: 50 # maximum speed, km/h
+    #ignore_traffic_light: true # whether to ignore traffic light
+    #overtake_allowed: true
+    #collision_time_ahead: 2.0 # used for collision checking
+    #max_speed: 50 
+# define the background traffic control by carla
+carla_traffic_manager:
+  random: true # whether to random select vehicles' color and model
+  vehicle_list: []
+  #- sp: #Location: Location(x=-2.648311, y=-69.894730, z=0.275307), Rotation: Rotation(pitch=0.000000, yaw=92.004189, roll=0.000000)
+   # - -2.7
+   # - -70
+   # - 0.28
+   # - 0
+   # - 92
+   # - 0
+  #  vehicle_speed_perc: -200 #Location: Location(x=6.316784, y=-25.297159, z=0.275307), Rotation: Rotation(pitch=0.000000, yaw=-108.033249, roll=0.000000)
+  #- sp: [6.316784, -25.297159, 0.275307,0.000000, -108.033249,0]
+  #- sp:
+  #  - 2.33
+   # - 20.5
+   # - 0.3
+   # - 0
+   # - 0
+   # - 0
+   # vehicle_speed_perc: -200
+  #- sp: #Location(x=-20.467728, y=0.351503, z=0.275307), Rotation: Rotation(pitch=0.000000, yaw=81.806999, roll=0.000000)00)
+   # - -20.5
+  #  - 0.35
+  #  - 0.28
+  #  - 0
+  #  - 81.8
+  #  - 0
+  #  vehicle_speed_perc: -200
+  #vehicle_list: ~  # a number or a list
+  # Used only when vehicle_list is a number.
+  # x_min, x_max, y_min, y_max, x_step, y_step, veh_num
+  #range:
+  #  - [ 2, 10, 0, 200, 3.5, 25, 10]
+    
+
+# define scenario. In this scenario, a 4-vehicle platoon already exists.
+scenario:
+  town:
+    name: null
+  background_traffic:
+    vehicle_num: 6 
+  single_cav_list: # this is for merging vehicle or single cav without v2x
+    - name: cav1
+      spawn_position: null #Location: Location(x=4.672596, y=69.624977, z=0.275307), Rotation: Rotation(pitch=0.000000, yaw=-88.891235, roll=0.000000)
+      destination: null #[-26.3, 8, 0.28 ] #[-12.51, 110.31, 0.3] #Location: Location(x=65.516594, y=7.808423, z=0.275307) #Location: Location(x=-26.262718, y=-7.955658, z=0.275307)
+      sensing:
+        perception:
+          activate: true
+          camera:
+            existing_camera: true
+            visualize: 1
+            num: 0 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions: 
+              #- [2.5, 0, 1.0, 0]
+              #- [ 0.0, 0.3, 1.8, 100 ]
+              #- [ 0.0, -0.3, 1.8, -100 ]
+              #- [ -2.0, 0.0, 1.5, 180 ]
+          lidar:
+            existing_lidar: false
+            visualize: true
+      v2x:
+        communication_range: 200
+        ms-van3t: true
+        #enabled: true
+      behavior:
+        #max_speed: 25
+        local_planner:
+          debug_trajectory: true
+          debug: true
+

@@ -91,6 +91,9 @@ class VehicleManager(object):
         self.vid = str(uuid.uuid1())
         self.vehicle = vehicle
         self.carla_map = carla_map
+        
+        #for static CAV
+        self.dest_config = config_yaml['destination']
 
         # retrieve the configure for different modules
         sensing_config = config_yaml['sensing']
@@ -224,20 +227,39 @@ class VehicleManager(object):
         # visualize the bev map if needed
         self.map_manager.run_step()
 
-        if isinstance(self.agent, PlatooningBehaviorAgentExtended):
-            if self.agent.v2xAgent.pcService.status in (FSM.MAINTINING, FSM.JOIN_RESPONSE, FSM.LEAVE_REQUEST):
-                target_acceleration, target_speed, target_pos = self.agent.run_step(target_speed)
-            else:
-                target_speed, target_pos = self.agent.run_step(target_speed)
-        elif isinstance(self.agent, IntruderBehaviorAgent):
-            if self.agent.v2xAgent.intruderApp.status == I_FSM.INTRUDING:
-                target_acceleration, target_speed, target_pos = self.agent.run_step(target_speed)
-            else:
-                target_speed, target_pos = self.agent.run_step(target_speed)
-        elif isinstance(self.agent, BehaviorAgent):
-            target_speed, target_pos = self.agent.run_step(target_speed)
+        #if isinstance(self.agent, PlatooningBehaviorAgentExtended):
+        #    if self.agent.v2xAgent.pcService.status in (FSM.MAINTINING, FSM.JOIN_RESPONSE, FSM.LEAVE_REQUEST):
+        #        target_acceleration, target_speed, target_pos = self.agent.run_step(target_speed)
+        #    else:
+        #        target_speed, target_pos = self.agent.run_step(target_speed)
+        #elif isinstance(self.agent, IntruderBehaviorAgent):
+        #    if self.agent.v2xAgent.intruderApp.status == I_FSM.INTRUDING:
+        #        target_acceleration, target_speed, target_pos = self.agent.run_step(target_speed)
+        #    else:
+        #        target_speed, target_pos = self.agent.run_step(target_speed)
+        #elif isinstance(self.agent, BehaviorAgent):
+        #    target_speed, target_pos = self.agent.run_step(target_speed)
 
-        control = self.controller.run_step(target_speed, target_pos, target_acceleration)
+       # control = self.controller.run_step(target_speed, target_pos, target_acceleration)
+        #for static CAV
+
+        if self.dest_config != None:
+            if isinstance(self.agent, PlatooningBehaviorAgentExtended):
+                if self.agent.v2xAgent.pcService.status in (FSM.MAINTINING, FSM.JOIN_RESPONSE, FSM.LEAVE_REQUEST):
+                    target_acceleration, target_speed, target_pos = self.agent.run_step(target_speed)
+                else:
+                    target_speed, target_pos = self.agent.run_step(target_speed)
+            elif isinstance(self.agent, IntruderBehaviorAgent):
+                if self.agent.v2xAgent.intruderApp.status == I_FSM.INTRUDING:
+                    target_acceleration, target_speed, target_pos = self.agent.run_step(target_speed)
+                else:
+                    target_speed, target_pos = self.agent.run_step(target_speed)
+            elif isinstance(self.agent, BehaviorAgent):
+                target_speed, target_pos = self.agent.run_step(target_speed)
+
+            control = self.controller.run_step(target_speed, target_pos, target_acceleration)
+        else:
+            control = None
 
         # dump data
         if self.data_dumper:

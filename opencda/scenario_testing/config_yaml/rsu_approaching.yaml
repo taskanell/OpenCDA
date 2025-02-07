@@ -1,0 +1,169 @@
+description: |-
+  Copyright 2021 <UCLA Mobility Lab>
+  Author: Runsheng Xu <rxx3386@ucla.edu>
+  Content: This is the scenario testing configuration file for single vehicle perception/localization/behavior/control
+           testing in high speed in the customized 2lanefree simple version.
+
+# First define the basic parameters of the vehicles
+vehicle_base:
+  sensing:
+    perception:
+      camera:
+        visualize: 1
+        num: 1 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+        # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+        positions: 
+         - [2.5, 0, 1.0, 0]
+      lidar:
+        visualize: true
+  map_manager:
+    visualize: false
+    activate: false
+  behavior:
+    max_speed: 50 # maximum speed, km/h
+    ignore_traffic_light: true # whether to ignore traffic light
+    overtake_allowed: true
+    #collision_time_ahead: 2.0 # used for collision checking
+    #max_speed: 50
+    local_planner:
+      bufer_size: 20 
+
+#rsu_base:
+#  sensing:
+ #   perception:
+ #     activate: true # when not activated, objects positions will be retrieved from server directly
+ #     camera:
+ #       visualize: 4 # how many camera images need to be visualized. 0 means no visualization for camera
+ #       num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+        # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+ #       positions:
+  #        - [2.5, 0, 1.0, 0]
+  #        - [0.0, 0.3, 1.8, 100]
+  #        - [0.0, -0.3, 1.8, -100]
+   #       - [-2.0, 0.0, 1.5, 180]
+   #   lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+   #     visualize: true
+
+    
+# define the background traffic control by carla
+carla_traffic_manager:
+  random: true # whether to random select vehicles' color and model
+  vehicle_list:
+  - spawn_position: [285, -169, 0.54, 0, 0, 0] #Location(x=284.782043, y=-169.035751, z=0.539108), Rotation: Rotation(pitch=0.000000, yaw=0.326125, roll=0.000000)
+  #  - -79
+  #  - 0.28
+  #  - 0
+  #  - 92
+  #  - 0
+    vehicle_speed_perc: -200
+  - spawn_position: [284, -180, 0.4, 0, 0,0]
+  #  - 2.33
+  #  - 20.5
+  #  - 0.3
+  #  - 0
+  #  - 0
+  #  - 0
+  #  vehicle_speed_perc: -200
+  - spawn_position: [314.587738, -180.297791,0.400000, 0 , -90 ,0] #Location(x=314.587738, y=-180.297791, z=0.400000), Rotation: Rotation(pitch=0.000000, yaw=-89.489075, roll=0.000000)
+  #  - -20.5
+  #  - 0.35
+  #  - 0.28
+  #  - 0
+  #  - 81.8
+  #  - 0
+    vehicle_speed_perc: -200
+  #vehicle_list: ~  # a number or a list
+  # Used only when vehicle_list is a number.
+  # x_min, x_max, y_min, y_max, x_step, y_step, veh_num
+  #range:
+  #  - [ 2, 10, 0, 200, 3.5, 25, 10]
+    
+
+# define scenario. In this scenario, a 4-vehicle platoon already exists.
+scenario:
+  town:
+    name: Town04
+  background_traffic:
+    vehicle_num: 2
+
+  #rsu_list:
+  #  - name: rsu1
+   #   id: 1
+   #   spawn_position: [284.547424, -173, 0.54, 0, 90.51,0] #Spawn Point 170 - Lowwcation: Location(x=311.348419, y=-209.547379, z=0.281942), Rotation: Rotation(pitch=0.000000, yaw=90.510933, roll=0.000000) 
+
+  single_cav_list: # this is for merging vehicle or single cav without v2x
+    - name: cav1
+      spawn_position: [284.547424, -173, 0.54, 0, 0,0] #Location(x=382.563629, y=-224.797226, z=0.281942), Rotation: Rotation(pitch=0.000000, yaw=90.592705, roll=0.000000)
+      destination: null #[258, -180, 0.4] #Location(x=258.460175, y=-180.456772, z=0.400000), Rotation: Rotation(pitch=0.000000, yaw=-89.823242, roll=0.000000)
+      sensing:
+        perception:
+          activate: true
+          camera:
+            visualize: 2
+            num: 2 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions: 
+              #- [2.5, 0, 1.0, 0]
+              - [0.0, -0.3, 1.8, -100]
+              - [ 0.0, 0.3, 1.8, 100 ]
+          lidar:
+            visualize: true
+      v2x:
+        communication_range: 100
+        ms-van3t: true
+        #enabled: true
+      behavior:
+        max_speed: 10
+        local_planner:
+          debug_trajectory: true
+          debug: true
+    - name: cav2
+      spawn_position: [314, -146, 0.28, 0, -89, 0] #Location(x=314.287689, y=-146.643005, z=0.281942), Rotation: Rotation(pitch=0.000000, yaw=-89.489075, roll=0.000000)
+      destination: [266.2, -169, 0.6] #Location: Location(x=284.782043, y=-169.035751, z=0.539108), Location(x=266.282227, y=-169.140869, z=0.600000)
+      sensing:
+        perception:
+          activate: true
+          camera:
+            visualize: 1
+            num: 1 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions: 
+              - [2.5, 0, 1.0, 0]
+              #- [ 0.0, 0.3, 1.8, 100 ]
+          lidar:
+            visualize: true
+      v2x:
+        communication_range: 100
+        ms-van3t: true
+        #enabled: true
+      behavior:
+        max_speed: 30
+        local_planner:
+          debug_trajectory: true
+          debug: true
+    - name: cav3
+      spawn_position: [311.6, -239, 0.28, 0, 90.5, 0] #Location: Location(x=311.608490, y=-238.711853, z=0.281942), Rotation: Rotation(pitch=0.000000, yaw=90.510933, roll=0.000000)
+      destination: [314, -146, 0.28] #Location(x=-9.437694, y=143.109421, z=0.275307)
+      sensing:
+        perception:
+          activate: true
+          camera:
+            visualize: 0
+            num: 1 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            positions: 
+              - [2.5, 0, 1.0, 0]
+   #           - [ 0.0, 0.3, 1.8, 100 ]
+   #           - [ 0.0, -0.3, 1.8, -100 ]
+   #           - [ -2.0, 0.0, 1.5, 180 ]
+          lidar:
+            visualize: true
+      v2x:
+        communication_range: 100
+        ms-van3t: true
+   #     enabled: true
+      behavior:
+        max_speed: 60
+        local_planner:
+          debug_trajectory: true
+          debug: true

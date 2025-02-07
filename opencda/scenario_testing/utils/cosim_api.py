@@ -136,6 +136,7 @@ class CoScenarioManager(ScenarioManager):
         """
         main_client = False
         if self.sumo_client_order == 1:
+            print("MAIN CLIENT SUMO TRUE")
             main_client = True
         # -----------------
         # sumo-->carla sync

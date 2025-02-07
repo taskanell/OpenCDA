@@ -91,7 +91,8 @@ class ExtendedVehicleManager(VehicleManager):
             data_dumping=False,
             pldm=False,
             log_dir=None,
-            ms_vanet=None):
+            ms_vanet=None,
+            role_name=None):
 
         super(ExtendedVehicleManager, self).__init__(vehicle,
                                                      config_yaml,
@@ -109,6 +110,7 @@ class ExtendedVehicleManager(VehicleManager):
         self.LDM_ids = set(range(1, 256))  # ID pool
         self.time = 0.0
         self.sensorObjects = []
+        self.role_name = role_name
         # if self.perception_manager.lidar:
         # self.o3d_vis = o3d_visualizer_init(vehicle.id * 1000)
         self.lidar_visualize = config_yaml['sensing']['perception']['lidar']['visualize']
@@ -159,6 +161,7 @@ class ExtendedVehicleManager(VehicleManager):
 
         if not self.pldm:
             self.LDM = LDM(self, self.v2xAgent, visualize=self.lidar_visualize)
+        print("VEH ID {} DONE WITH MANAGER".format(vehicle.id))
 
     def get_time_ms(self):
         return self.map_manager.world.get_snapshot().elapsed_seconds * 1000
@@ -178,6 +181,7 @@ class ExtendedVehicleManager(VehicleManager):
         # print("Vehicle ", self.vehicle.id, " speed: ", ego_spd)
         # object detection
         objects = self.perception_manager.detect(ego_pos)
+        print("Objects list: ",objects)
         self.sensorObjects = objects['vehicles']
         detected_n = len(objects['vehicles'])
         file_detection = (time.time_ns() / 1000) - file_timestamp
@@ -247,6 +251,7 @@ class ExtendedVehicleManager(VehicleManager):
     def translateDetections(self, object_list):
         ego_pos, ego_spd, objects = self.getInfo()
         returnedObjects = []
+        print(f"Obj list: {object_list}")
         for obj in object_list['vehicles']:
             if obj.carla_id == -1:
                 continue  # If object can't be matched with a CARLA vehicle, we ignore it
@@ -260,7 +265,8 @@ class ExtendedVehicleManager(VehicleManager):
                                 obj.bounding_box.extent.y * 2,
                                 obj.bounding_box.extent.x * 2,
                                 self.time,
-                                obj.confidence)
+                                obj.confidence,
+                                label=obj.label)
             LDMobj.xSpeed = obj.velocity.x
             LDMobj.ySpeed = obj.velocity.y
             # LDMobj.yaw = obj.yaw
@@ -269,6 +275,7 @@ class ExtendedVehicleManager(VehicleManager):
             LDMobj.yaw = curr_wpt.transform.rotation.yaw
             LDMobj.id = obj.carla_id
             returnedObjects.append(LDMobj)
+            print(f'TRANSLATED LDM OBJ: {obj.label}')
         return {'vehicles': returnedObjects}
 
     def getInfo(self):

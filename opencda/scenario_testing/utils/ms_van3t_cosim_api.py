@@ -24,12 +24,15 @@ sys.path.append('./opencda/scenario_testing/utils/proto')
 import carla_pb2_grpc
 import carla_pb2
 
+import json
+
 class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
     def __init__(self, seed, steplength, scenario_params,
-                 scenario_manager, cav_list, traffic_manager, step_event, stop_event):
+                 scenario_manager, cav_list,spectator_transform ,traffic_manager, step_event, stop_event):
         self.scenario_params = scenario_params
         self.scenario_manager = scenario_manager
         self.cav_list = cav_list
+        self.spectator_transform = spectator_transform
         self.world = scenario_manager.world
         self.traffic_manager = traffic_manager
         self.client = scenario_manager.client
@@ -42,18 +45,19 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
 
         # Set up the simulator in synchronous mode
         settings = self.world.get_settings()
+        print(settings)
         settings.synchronous_mode = True  # Enables synchronous mode
         settings.fixed_delta_seconds = steplength
         self.world.apply_settings(settings)
 
         # Set up the TM in synchronous mode
-        traffic_manager.set_synchronous_mode(True)
+        ##traffic_manager.set_synchronous_mode(True)
 
         # Set a seed so behaviour can be repeated if necessary
-        traffic_manager.set_random_device_seed(seed)
-        random.seed(seed)
-        if self.scenario_params['scenario']['background_traffic']:
-            self.generateTraffic(self.scenario_params['scenario']['background_traffic']['vehicle_num'])
+        ##traffic_manager.set_random_device_seed(seed)
+        ##random.seed(seed)
+        #if self.scenario_params['scenario']['background_traffic']:
+        #    self.generateTraffic(self.scenario_params['scenario']['background_traffic']['vehicle_num'])
         self.steps = 0
         self.time_offset = 0  # Aux variable to keep track of the time offset between CARLA and ms-van3t
 
@@ -78,12 +82,17 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
     def ExecuteOneTimeStep(self, request, context):
         if self.steps == 0:
             self.time_offset = self.world.get_snapshot().elapsed_seconds
+        else:
+            ns3_timestamp = self.world.get_snapshot().elapsed_seconds - self.time_offset
+            self.world.debug.draw_string(self.spectator_transform.location - carla.Location(x=0,y=3.5),f"NS-3 Simulation Time: {ns3_timestamp:.2f} sec",True,carla.Color(0,0,0,255))
+            #+carla.Location(x=30,y=30)
         self.step_event.wait()
         self.step_event.clear()
         if self.stop_event.is_set():
             self.stop_event.clear()
             return carla_pb2.Boolean(value=False)
         self.world.tick()
+        print("ONE TIME STEP EXECUTED")
         self.tick_event.set()
         self.steps += 1
         return carla_pb2.Boolean(value=True)
@@ -284,11 +293,15 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                     ego_pos, ego_spd, objects = cav.getInfo()
                     returnValue = carla_pb2.Objects()
                     for PO in cav.LDM.getAllPOs():
+                        print(f'PO ID: {PO.id}')
                         if (not PO.connected and PO.tracked and PO.onSight) or PO.CPM:
+                            print('CPM OR TRACKED WITH ID: ', PO.id)
                             object = carla_pb2.Object()
                             object.id = PO.id
                             if PO.CPM and len(PO.perceivedBy) == 0:
+                                #print("CONTINUE FOR ID:",PO.id)
                                 continue  # TODO understand why this happens --> it happens because CPM fusion does not set this value
+                            #CUSTOM ROS MESSAGE CREATION
                             object.dx = PO.perception.xPosition - ego_pos.location.x
                             object.dy = PO.perception.yPosition - ego_pos.location.y
                             object.speed.x = PO.perception.xSpeed
@@ -323,6 +336,26 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                             else:
                                 object.perceivedBy = -1
                             returnValue.objects.append(object)
+
+                            if cav.role_name == 'ego':
+
+                                location = {
+                                    "x": PO.perception.xPosition,
+                                    "y": PO.perception.yPosition,
+                                    "z": 0  # Assuming z is always 0 in this case
+                                }
+
+                                json_message = {
+                                    "dx": PO.perception.xPosition - ego_pos.location.x,
+                                    "dy": PO.perception.yPosition - ego_pos.location.y,
+                                    "location": location
+                                }
+
+                                json_string = json.dumps(json_message, indent=4)
+
+                                print(json_string)
+
+                    print(returnValue.objects)
                     return returnValue
 
     # message ObjectMinimal {
@@ -331,6 +364,7 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
     # double length = 3;
     # double width = 4;
     # }
+    # TODO also get the pedestrians list!!!
     def GetGTaccuracy(self, request, context):
         IoU = 0.0
         obj_o3d_bbx, obj_line_set = get_abs_o3d_bbx(request.transform.location.x, request.transform.location.y,
@@ -517,19 +551,21 @@ class MsVan3tCoScenarioManager():
 
     """
 
-    def __init__(self, scenario_params, scenario_manager, cav_list, traffic_manager, step_event,
+    def __init__(self, scenario_params, scenario_manager, cav_list, spectator_transform ,traffic_manager, step_event,
                  stop_event,
                  address='localhost', port=1337):
         self.scenario_params = scenario_params
         self.scenario_manager = scenario_manager
         self.traffic_manager = traffic_manager
         self.cav_list = cav_list
+        self.spectator_transform = spectator_transform
         self.step_event = step_event
         self.stop_event = stop_event
         self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
         self.carla_object = CarlaAdapter(1, 0.05, self.scenario_params,
                                          self.scenario_manager,
                                          self.cav_list,
+                                         self.spectator_transform,
                                          self.traffic_manager,
                                          self.step_event,
                                          self.stop_event)

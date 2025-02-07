@@ -308,7 +308,7 @@ class ExtendedPerceptionManager(PerceptionManager):
                 self.o3d_vis,
                 self.count,
                 self.lidar.o3d_pointcloud,
-                objects)
+                objects)      
         # add traffic light
         objects = self.retrieve_traffic_lights(objects)
         self.objects = objects

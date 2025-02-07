@@ -3,13 +3,20 @@ carla_traffic_manager:
   global_speed_perc: -50
   ignore_lights_percentage: 0
   vehicle_list:
-  - spawn_position:
-    - 131.032
-    - 139.51
-    - 0.3
-    - 0
-    - 0
-    - 0
+  #- spawn_position:
+  #  - 131.032
+  #  - 139.51
+  #  - 0.3
+  #  - 0
+  #  - 0
+  #  - 0
+  #- spawn_position: [111.7194, 143.51, 0.3, 0, 0, 0]
+    #vehicle_speed_perc: -200
+  #- spawn_position: [121.7194, 139.51, 0.3, 0, 0, 0]
+  #  vehicle_speed_perc: -200
+  - spawn_position: [91.7194, 146.51, 0.3, 0, 0, 0]
+    vehicle_speed_perc: -200
+  - spawn_position: [131.032, 139.51, 0.3, 0, 0, 0]
     vehicle_speed_perc: -200
   - spawn_position:
     - 121.5344
@@ -35,6 +42,7 @@ vehicle_base:
           - [ -2.0, 0.0, 1.5, 180 ]
       lidar: # lidar sensor configuration, check CARLA sensor reference for more details
         visualize: true
+        #range: 50
 
     localization: &base_localize
       activate: false # when not activated, ego position will be retrieved from server directly
@@ -67,116 +75,116 @@ scenario:
   background_traffic:
     vehicle_num: 20
   single_cav_list: # this is for merging vehicle or single cav without v2x
+    #- name: cav1
+    #  spawn_position: [121.7194, 139.51, 0.3, 0, 0, 0]
+    #  destination: [606.87, 145.39, 0]
+    #  sensing:
+    #    perception:
+    #      activate: true
+    #      camera:
+    #        visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
+    #        num: 1 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+    #        positions:
+    #          - [2.5, 0, 1.0, 0]
+              #- [0.0, 0.3, 1.8, 100]
+              #- [0.0, -0.3, 1.8, -100]
+              #- [-2.0, 0.0, 1.5, 180]
+    #      lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+    #        visualize: true
+    #  v2x:
+    #    communication_range: 100
+    #    ms-van3t: true # whether to use ms-van3t for communication
+    #  behavior:
+    #    <<: *base_behavior
+    #    max_speed: 70 # maximum speed, km/h
+    #    tailgate_speed: 111
+    #    overtake_allowed: false
+    #    local_planner:
+    #      debug_trajectory: true
+    #      debug: false
+
+   # - name: cav2
+   #   spawn_position: [111.7194, 143.51, 0.3, 0, 0, 0]
+   #   destination: [606.87, 145.39, 0]
+   #   sensing:
+   #     perception:
+   #       activate: true
+   #       camera:
+   #         visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
+   #         num: 1 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+    #        positions:
+   #           - [2.5, 0, 1.0, 0]
+              #- [0.0, 0.3, 1.8, 100]
+              #- [0.0, -0.3, 1.8, -100]
+             # - [-2.0, 0.0, 1.5, 180]
+   #       lidar: # lidar sensor configuration, check CARLA sensor reference for more details
+   #         visualize: true
+   #   v2x:
+   #     communication_range: 100
+   #     ms-van3t: true
+   #   behavior:
+   #     <<: *base_behavior
+   #     max_speed: 100 # maximum speed, km/h
+   #     tailgate_speed: 111
+   #     overtake_allowed: true
+   #     local_planner:
+   #       debug_trajectory: true
+   #       debug: false
+
     - name: cav1
-      spawn_position: [121.7194, 139.51, 0.3, 0, 0, 0]
+      spawn_position: [121.7194, 139.51, 0.3, 0, 0, 0] # [101.7194, 139.51, 0.3, 0, 0, 0]
       destination: [606.87, 145.39, 0]
       sensing:
         perception:
           activate: true
           camera:
             visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
-            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+            num: 1 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
             # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
             positions:
               - [2.5, 0, 1.0, 0]
-              - [0.0, 0.3, 1.8, 100]
-              - [0.0, -0.3, 1.8, -100]
-              - [-2.0, 0.0, 1.5, 180]
+              #- [0.0, 0.3, 1.8, 100]
+              #- [0.0, -0.3, 1.8, -100]
+              #- [-2.0, 0.0, 1.5, 180]
           lidar: # lidar sensor configuration, check CARLA sensor reference for more details
             visualize: true
       v2x:
-        communication_range: 35
-        ms-van3t: true # whether to use ms-van3t for communication
+        communication_range: 100
+        ms-van3t: true
       behavior:
         <<: *base_behavior
-        max_speed: 70 # maximum speed, km/h
+        max_speed: 80 # maximum speed, km/h
         tailgate_speed: 111
-        overtake_allowed: false
+        overtake_allowed: true
         local_planner:
           debug_trajectory: true
           debug: false
 
     - name: cav2
       spawn_position: [111.7194, 143.51, 0.3, 0, 0, 0]
-      destination: [606.87, 145.39, 0]
+      destination:  [606.87, 145.39, 0]
       sensing:
         perception:
           activate: true
           camera:
-            visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
-            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
-            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
+            visualize: 2 # how many camera images need to be visualized. 0 means no visualization for camera
+            num: 2 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
+              # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
             positions:
               - [2.5, 0, 1.0, 0]
-              - [0.0, 0.3, 1.8, 100]
-              - [0.0, -0.3, 1.8, -100]
+              #- [0.0, 0.3, 1.8, 100]
+              #- [0.0, -0.3, 1.8, -100]
               - [-2.0, 0.0, 1.5, 180]
           lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-            visualize: true
+              visualize: true
       v2x:
-        communication_range: 35
+        communication_range: 100
         ms-van3t: true
       behavior:
         <<: *base_behavior
-        max_speed: 100 # maximum speed, km/h
-        tailgate_speed: 111
-        overtake_allowed: true
-        local_planner:
-          debug_trajectory: true
-          debug: false
-
-    - name: cav3
-      spawn_position: [101.7194, 139.51, 0.3, 0, 0, 0]
-      destination: [606.87, 145.39, 0]
-      sensing:
-        perception:
-          activate: true
-          camera:
-            visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
-            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
-            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
-            positions:
-              - [2.5, 0, 1.0, 0]
-              - [0.0, 0.3, 1.8, 100]
-              - [0.0, -0.3, 1.8, -100]
-              - [-2.0, 0.0, 1.5, 180]
-          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-            visualize: true
-      v2x:
-        communication_range: 35
-        ms-van3t: true
-      behavior:
-        <<: *base_behavior
-        max_speed: 100 # maximum speed, km/h
-        tailgate_speed: 111
-        overtake_allowed: true
-        local_planner:
-          debug_trajectory: true
-          debug: false
-
-    - name: cav4
-      spawn_position: [91.7194, 146.51, 0.3, 0, 0, 0]
-      destination: [606.87, 145.39, 0]
-      sensing:
-        perception:
-          activate: true
-          camera:
-            visualize: 1 # how many camera images need to be visualized. 0 means no visualization for camera
-            num: 4 # how many cameras are mounted on the vehicle. Maximum 3(frontal, left and right cameras)
-            # relative positions (x,y,z,yaw) of the camera. len(positions) should be equal to camera num
-            positions:
-              - [2.5, 0, 1.0, 0]
-              - [0.0, 0.3, 1.8, 100]
-              - [0.0, -0.3, 1.8, -100]
-              - [-2.0, 0.0, 1.5, 180]
-          lidar: # lidar sensor configuration, check CARLA sensor reference for more details
-            visualize: true
-      v2x:
-        communication_range: 35
-        ms-van3t: true
-      behavior:
-        <<: *base_behavior
-        max_speed: 100 # maximum speed, km/h
+        max_speed: 80 # maximum speed, km/h
         tailgate_speed: 111
         overtake_allowed: true
         local_planner:

@@ -18,8 +18,8 @@ import json
 from threading import Thread
 from threading import Event
 # from opencda.customize.core.common.vehicle_manager import LDMObject
-from opencda.co_simulation.sumo_integration.bridge_helper import BridgeHelper
-import traci  # pylint: disable=import-error
+#from opencda.co_simulation.sumo_integration.bridge_helper import BridgeHelper
+#import traci  # pylint: disable=import-error
 import csv
 import time
 import psutil

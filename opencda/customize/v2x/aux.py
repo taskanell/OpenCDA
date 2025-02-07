@@ -4,9 +4,10 @@ import copy
 
 def newLDMentry(perception, id, connected=False, onSight=True):
     # Function to create a new LDMentry from a perception
+    print(f'OBJ {id} has label {perception.label}')
     retEntry = LDMentry(id, perception.xPosition, perception.yPosition, perception.width, perception.length,
                         perception.timestamp, perception.confidence, xSpeed=perception.xSpeed, ySpeed=perception.ySpeed,
-                        heading=perception.heading, connected=connected, o3d_bbx=perception.o3d_bbx, onSight=True)
+                        heading=perception.heading, connected=connected, o3d_bbx=perception.o3d_bbx, onSight=True, label=perception.label)
     retEntry.insertPerception(retEntry.perception)
     return retEntry
 
@@ -23,11 +24,16 @@ def newPLDMentry(perception, id, detected=True, onSight=True):
 
 class LDMentry:
     def __init__(self, id, xPosition, yPosition, width, length, timestamp, confidence, xSpeed=0, ySpeed=0, heading=0,
-                 connected=False, o3d_bbx=None, onSight=True):
+                 connected=False, o3d_bbx=None, onSight=True, label=None):
         self.perception = Perception(xPosition, yPosition, width, length, timestamp, confidence,
-                                     xSpeed=xSpeed, ySpeed=ySpeed, heading=heading, o3d_bbx=o3d_bbx)
+                                     xSpeed=xSpeed, ySpeed=ySpeed, heading=heading, o3d_bbx=o3d_bbx, label=label)
         self.perception.connected = connected
-        self.pathHistory = deque([], maxlen=10)
+        if label == 0:
+            maxlen = 4
+        else:
+            maxlen = 10
+        self.pathHistory = deque([], maxlen=maxlen)
+        #self.label = label
         self.CPM_lastIncluded = None  # Last included perception on a CPM
         # Metadata
         self.id = id
@@ -41,10 +47,15 @@ class LDMentry:
 
     def insertPerception(self, obj):
         self.perception = obj
-        if len(self.pathHistory) >= 10:
+        print(f"PATH HIST: {len(self.pathHistory)} for {obj.id}")
+        if self.perception.label == 0:
+            thres = 4
+        else: 
+            thres = 10
+        if len(self.pathHistory) >= thres:
             self.pathHistory.popleft()
         self.pathHistory.append(copy.deepcopy(obj))
-        if len(self.pathHistory) == 10 or self.connected or self.CPM:
+        if len(self.pathHistory) == thres or self.connected or self.CPM:
             self.tracked = True
 
     def getLatestPoint(self):
@@ -56,7 +67,7 @@ class LDMentry:
 
 class Perception:
     def __init__(self, xPosition, yPosition, width, length, timestamp, confidence, xSpeed=0, ySpeed=0, heading=0,
-                 o3d_bbx=None, dxSpeed=0, dySpeed=0, fromID=None, ID=None, yaw = 0):
+                 o3d_bbx=None, dxSpeed=0, dySpeed=0, fromID=None, ID=None, yaw = 0, label=None):
         self.id = ID
         self.xPosition = xPosition
         self.yPosition = yPosition
@@ -81,6 +92,8 @@ class Perception:
         self.connected = False
         self.fromID = fromID
 
+        self.label = label
+        print(f'obj with id {self.id} has label {self.label}')
 
 class PLDMentry:
     def __init__(self, id, xPosition, yPosition, width, length, timestamp, confidence, xSpeed=0, ySpeed=0, heading=0,

@@ -98,6 +98,7 @@ class MapManager(object):
         self.raster_size = np.array([config['raster_size'][0],
                                      config['raster_size'][1]])
         self.lane_sample_resolution = config['lane_sample_resolution']
+        print(self.lane_sample_resolution)
 
         self.raster_radius = \
             float(np.linalg.norm(self.raster_size *
@@ -284,12 +285,18 @@ class MapManager(object):
             lanes_id.append(lane_id)
 
             waypoints = [waypoint]
+            #print ("here: ",i)
             nxt = waypoint.next(self.lane_sample_resolution)[0]
             # looping until next lane
             while nxt.road_id == waypoint.road_id \
-                    and nxt.lane_id == waypoint.lane_id:
+                    and nxt.lane_id == waypoint.lane_id :
                 waypoints.append(nxt)
-                nxt = nxt.next(self.lane_sample_resolution)[0]
+                print(nxt)
+                if nxt.next(self.lane_sample_resolution):
+                    break
+                else:
+                    nxt = nxt.next(self.lane_sample_resolution)[0]
+
 
             # waypoint is the centerline, we need to calculate left lane mark
             left_marking = [lateral_shift(w.transform, -w.lane_width * 0.5) for

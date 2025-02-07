@@ -12,6 +12,7 @@ import time
 import numpy as np
 import open3d as o3d
 from matplotlib import cm
+import carla 
 from scipy.stats import mode
 from opencda.customize.v2x.aux import PLDMentry
 import opencda.core.sensing.perception.sensor_transformation as st
@@ -48,7 +49,37 @@ LABEL_COLORS = np.array([
 ]) / 255.0  # normalize each channel [0-1] since is what Open3D uses
 
 
-def o3d_pointcloud_encode(raw_data, point_cloud):
+def transform_lidar_to_vehicle_frame(points, vehicle_transform):
+    """
+    Transforms LiDAR points to the vehicle's local frame.
+
+    :param points: Nx3 numpy array of LiDAR points.
+    :param vehicle_transform: CARLA Transform object of the vehicle.
+    :return: Transformed Nx3 numpy array.
+    """
+    # Get rotation and location
+    #location = vehicle_transform.location
+    #location = vehicle_transform.location
+    location = carla.Location(0,0,0)
+    #rotation = vehicle_transform.rotation
+    rotation = carla.Rotation(0,0,0)
+
+    # Create rotation matrix from yaw
+    yaw = np.radians(rotation.yaw)
+    rotation_matrix = np.array([
+        [np.cos(yaw), -np.sin(yaw), 0],
+        [np.sin(yaw), np.cos(yaw), 0],
+        [0, 0, 1]
+    ])
+
+    # Translate and rotate points
+    translated_points = points - np.array([location.x, location.y, location.z])
+    transformed_points = np.dot(rotation_matrix.T, translated_points.T).T
+    return transformed_points
+
+
+
+def o3d_pointcloud_encode(ego_pos,raw_data, point_cloud):
     """
     Encode the raw point cloud(np.array) to Open3d PointCloud object.
 
@@ -75,8 +106,11 @@ def o3d_pointcloud_encode(raw_data, point_cloud):
     # We're negating the y to correclty visualize a world that matches
     # what we see in Unreal since Open3D uses a right-handed coordinate system
     points[:, :1] = -points[:, :1]
+    
+    #transformed_points = transform_lidar_to_vehicle_frame(points, ego_pos)
+    transformed_points = points
 
-    point_cloud.points = o3d.utility.Vector3dVector(points)
+    point_cloud.points = o3d.utility.Vector3dVector(transformed_points)
     point_cloud.colors = o3d.utility.Vector3dVector(int_color)
 
 
@@ -97,10 +131,14 @@ def o3d_visualizer_init(actor_id):
     """
     vis = o3d.visualization.Visualizer()
     vis.create_window(window_name=str(actor_id),
-                      width=800,
-                      height=800,
-                      left=480,
-                      top=270)
+                      #width=550,
+                      width=680,
+                      #height=550,
+                      height=610,
+                      #left=480,
+                      left=550,
+                      #top=270)
+                      top = 300)
     vis.get_render_option().background_color = [0, 0, 0]
     vis.get_render_option().point_size = 1
     vis.get_render_option().show_coordinate_frame = True
@@ -220,17 +258,21 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
     for key, object_list in objects.items():
         # we only draw vehicles for now
         if key != 'vehicles':
+            print(key)
             continue
         for object_ in object_list:
             if object_.perception.line_set is not None:
                 geometry = object_.perception.line_set
                 if object_.connected:
+                    print('CONNECTED')
                     colors = [[0, 1, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
                 elif not object_.connected and object_.onSight and object_.tracked:
+                    print('TRACKED')
                     colors = [[1, 0, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
                 elif not object_.connected and not object_.onSight and object_.CPM:
+                    print('CPM PERCEIVED')
                     colors = [[1, 0.6, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
                 elif not object_.connected and not object_.onSight and object_.tracked:
@@ -252,6 +294,14 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
                     continue
 
             vis.add_geometry(geometry)
+            #print(f'line set {object_.perception.line_set}')
+            #points = np.asarray(geometry.points)
+            #print(f'line points {points}')
+            #label_position = points.mean(axis=0)  # Centroid of the points
+            #label_text = str(object_.perception.id)
+            #vis.add_3d_label(label_position, label_text)
+            #vis.add_gevis.add_geometry(text_geometry)
+            #LDM_geometries.append(text_geometry)
             LDM_geometries.append(geometry)
 
     # vis.add_geometry(test_rotation())
@@ -269,7 +319,7 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
     vis.poll_events()
     vis.update_renderer()
     # # This can fix Open3D jittering issues:
-    time.sleep(0.001)
+    time.sleep(0.0001)
 
     for geometry in LDM_geometries:
         vis.remove_geometry(geometry)
@@ -370,12 +420,14 @@ def o3d_camera_lidar_fusion(objects,
             int(detection[2]), int(detection[3])
         label = int(detection[5])
         confidence = float(detection[4])
+        print(f'Object {label} with confidence {confidence}')
 
         # choose the lidar points in the 2d yolo bounding box
         points_in_bbx = \
             (projected_lidar[:, 0] > x1) & (projected_lidar[:, 0] < x2) & \
             (projected_lidar[:, 1] > y1) & (projected_lidar[:, 1] < y2) & \
             (projected_lidar[:, 2] > 0.0)
+        
         # ignore intensity channel
         select_points = lidar_3d[points_in_bbx][:, :-1]
 
@@ -392,6 +444,8 @@ def o3d_camera_lidar_fusion(objects,
                         (np.abs(select_points[:, 1]) > y_common - 3) & \
                         (np.abs(select_points[:, 1]) < y_common + 3)
         select_points = select_points[points_inlier]
+
+        print(f'POINTS IN BBX: {len(select_points)}')
 
         if select_points.shape[0] < 4:
             continue
@@ -429,7 +483,8 @@ def o3d_camera_lidar_fusion(objects,
         corner = corner.transpose()[:, :3]
 
         if is_vehicle_cococlass(label):
-            obstacle_vehicle = ObstacleVehicle(corner, aabb, confidence=confidence)
+            pedestrian = label if label==0 else None
+            obstacle_vehicle = ObstacleVehicle(corner, aabb, confidence=confidence,label=pedestrian)
             if obb is not None:
                 obstacle_vehicle.o3d_obb = obb
                 obstacle_vehicle.bounding_box.extent.x = obb.extent[0]/2
@@ -440,6 +495,12 @@ def o3d_camera_lidar_fusion(objects,
                 objects['vehicles'].append(obstacle_vehicle)
             else:
                 objects['vehicles'] = [obstacle_vehicle]
+            if label == 0:
+                print('PEDESTRIAN DETECTED')
+                if 'pedestrians' in objects:
+                    objects['pedestrians'].append(obstacle_vehicle)
+                else: 
+                    objects['pedestrians'] = [obstacle_vehicle]
         # todo: refine the category
         # we regard or other obstacle rather than vehicle as static class
         else:

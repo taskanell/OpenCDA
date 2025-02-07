@@ -11,6 +11,7 @@ import math
 import random
 import sys
 import json
+import time
 from random import shuffle
 from omegaconf import OmegaConf
 from omegaconf.listconfig import ListConfig
@@ -178,12 +179,12 @@ class ScenarioManager:
         self.scenario_params = scenario_params
         self.carla_version = carla_version
 
-        simulation_config = scenario_params['world']
+        #simulation_config = scenario_params['world']
 
         # set random seed if stated
-        if 'seed' in simulation_config:
-            np.random.seed(simulation_config['seed'])
-            random.seed(simulation_config['seed'])
+        ##if 'seed' in simulation_config:
+        ##    np.random.seed(simulation_config['seed'])
+        ##    random.seed(simulation_config['seed'])
 
         self.client = \
             carla.Client(carla_host, carla_port)
@@ -193,7 +194,13 @@ class ScenarioManager:
             self.world = load_customized_world(xodr_path, self.client)
         elif town:
             try:
+                print("town: ",town)
                 self.world = self.client.load_world(town)
+                #self.sim = self.client.get_world()
+                spawn_points = self.world.get_map().get_spawn_points()
+                #for i, spawn_point in enumerate(spawn_points):  ### get spawn points on the map
+                    #self.world.debug.draw_string(spawn_point.location, str(i), life_time=1000) ### get spawn points on the map
+                    #print(f"Spawn Point {i} - Location: {spawn_point.location}, Rotation: {spawn_point.rotation}")
             except RuntimeError:
                 print(
                     f"{bcolors.FAIL} %s is not found in your CARLA repo! "
@@ -204,7 +211,7 @@ class ScenarioManager:
 
         if not self.world:
             sys.exit('World loading failed')
-
+        '''
         self.origin_settings = self.world.get_settings()
         new_settings = self.world.get_settings()
 
@@ -217,10 +224,10 @@ class ScenarioManager:
                 'ERROR: Current version only supports sync simulation mode')
 
         self.world.apply_settings(new_settings)
-
+        '''
         # set weather
-        weather = self.set_weather(simulation_config['weather'])
-        self.world.set_weather(weather)
+        ##weather = self.set_weather(simulation_config['weather'])
+        ##self.world.set_weather(weather)
 
         # Define probabilities for each type of blueprint
         self.use_multi_class_bp = scenario_params["blueprint"][
@@ -311,9 +318,16 @@ class ScenarioManager:
             cav_config = OmegaConf.merge(self.scenario_params['vehicle_base'],
                                          platoon_base,
                                          cav_config)
+            if i == 0:
+                manual_cav_config = cav_config
             # if the spawn position is a single scalar, we need to use map
             # helper to transfer to spawn transform
-            if 'spawn_special' not in cav_config:
+            if cav_config['spawn_position'] == None:
+                print('here')
+                #self.world.tick()
+                #time.sleep(0.05)
+                continue
+            elif 'spawn_special' not in cav_config:
                 spawn_transform = carla.Transform(
                     carla.Location(
                         x=cav_config['spawn_position'][0],
@@ -372,7 +386,16 @@ class ScenarioManager:
                 if 'intruder' in cav_config['v2x']:
                     cav_vehicle_bp.set_attribute('color', '255, 0, 0')
                 # print ('transform:', spawn_transform)
-                vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+
+                #vehicle = self.world.spawn_actor(cav_vehicle_bp, spawn_transform)
+
+                vehicle = self.world.try_spawn_actor(cav_vehicle_bp, spawn_transform)
+                print(vehicle)
+                if not vehicle:
+                    print('FAILED TO SPAWN VEHICLE')
+                    self.world.debug.draw_string(spawn_transform.location, "spawn_fail_"+ str(i), False, carla.Color(200, 200, 0))
+                    continue
+
                 # create vehicle manager for each cav
                 vehicle_manager = ExtendedVehicleManager(
                     vehicle, cav_config, application,
@@ -397,17 +420,77 @@ class ScenarioManager:
             self.world.tick()
 
             vehicle_manager.v2x_manager.set_platoon(None)
-
-            destination = carla.Location(x=cav_config['destination'][0],
-                                         y=cav_config['destination'][1],
-                                         z=cav_config['destination'][2])
-            vehicle_manager.update_info_LDM()
-            vehicle_manager.set_destination(
+            
+            #for static CAV
+            if cav_config['destination'] != None:
+                destination = carla.Location(x=cav_config['destination'][0],
+                                            y=cav_config['destination'][1],
+                                            z=cav_config['destination'][2])
+                vehicle_manager.set_destination(
                 vehicle_manager.vehicle.get_location(),
                 destination,
                 clean=True)
+                
+            vehicle_manager.update_info_LDM()
+            
 
             single_cav_list.append(vehicle_manager)
+
+        #main_act_vehicle_filter = [
+        #    #'vehicle.mercedes.sprinter',  #2 not connected vehs, 1 coming from the bottom & 1 coming from the up, nearest to the square
+        #    'vehicle.nissan.patrol_2021', #connected veh, coming from the left side
+        #    #'vehicle.seat.leon',          #not connected veh, coming from the right, nearest to the square
+        #    'vehicle.ford.mustang',       #connected cpm veh, coming from right, farest to the square
+        #    'vehicle.nissan.micra'        #connecte cpm veh, ego vehicle
+        #]
+        print('HERE')
+        counter = 0
+        cv = 0
+        wanted_strings = ['path','obstacle']
+        wanted_keys = [key for key in self.scenario_params.keys() if any(ws in key.lower() for ws in wanted_strings) ]
+        print(wanted_keys)
+        #time.sleep(0.5)
+        #self.world.tick()
+        while len(self.world.get_actors().filter('vehicle.*')) < len(wanted_keys):
+            time.sleep(0.05)
+            print(len(self.world.get_actors().filter('vehicle.*')))
+            self.world.tick()
+            counter += 1
+            continue
+        print("TOTAL NUMBER OF TICKS UNTIL OVERALL SPAWNING: ", counter)
+        counter = 0
+        #self.world.tick()
+        #time.sleep(0.1)
+        all_sensors = self.world.get_actors().filter('sensor.*')  
+        print("SENSORS: ",all_sensors)
+        #print(list(self.scenario_params.keys()))
+        print("VEHICLES: ",self.world.get_actors().filter('vehicle.*'))
+        for actor in self.world.get_actors().filter('vehicle.*'):
+            cv += 1
+            if actor.attributes['role_name'] == 'ego' or actor.attributes['role_name'] == 'other_agent' :
+                
+                manual_control_vehicle = actor
+                counter += 1
+                all_sensors = self.world.get_actors().filter('sensor.*')  
+                print("SENSORS: ",all_sensors)
+                attached_sensors = [sensor for sensor in all_sensors if sensor.parent.id == actor.id]
+                print("ATTACHED SENSORS: ", attached_sensors)
+                print(f"MANUAL CONTROL SPAWNED VEH ID: {manual_control_vehicle.id} with type {manual_control_vehicle.type_id}")
+                
+                
+                vehicle_manager = ExtendedVehicleManager(
+                            manual_control_vehicle, manual_cav_config, application,
+                            self.carla_map, self.cav_world,
+                            current_time=self.scenario_params['current_time'],
+                            data_dumping=data_dump,
+                            pldm=pldm, log_dir=log_dir,ms_vanet=True,role_name=actor.attributes['role_name'])
+                self.world.tick()
+                vehicle_manager.v2x_manager.set_platoon(None)
+                vehicle_manager.update_info_LDM()
+                single_cav_list.append(vehicle_manager)
+        print("TOTAL VEHICLES: ", cv)
+        print("NUM OF CAVs: ", counter)
+
 
         return single_cav_list
 
@@ -840,7 +923,7 @@ class ScenarioManager:
                     # Given the label (class), find all associated blueprints in CARLA
                     ego_vehicle_random_list = multi_class_vehicle_blueprint_filter(
                         label, blueprint_library, self.bp_meta)
-                ego_vehicle_bp = random.choice(ego_vehicle_random_list)
+                    ego_vehicle_bp = random.choice(ego_vehicle_random_list)
 
                 if ego_vehicle_bp.has_attribute("color"):
                     color = random.choice(
@@ -848,16 +931,24 @@ class ScenarioManager:
                             'color').recommended_values)
                     ego_vehicle_bp.set_attribute('color', color)
 
-            vehicle = self.world.spawn_actor(ego_vehicle_bp, spawn_transform)
-            vehicle.set_autopilot(True, tm.get_port())
+            #vehicle = self.world.spawn_actor(ego_vehicle_bp, spawn_transform)
+            #vehicle.set_autopilot(True, tm.get_port())
 
-            if 'vehicle_speed_perc' in vehicle_config:
-                tm.vehicle_percentage_speed_difference(
-                    vehicle, vehicle_config['vehicle_speed_perc'])
-            tm.auto_lane_change(vehicle, traffic_config['auto_lane_change'])
-            tm.ignore_lights_percentage(vehicle, 0)
+            vehicle = self.world.try_spawn_actor(ego_vehicle_bp, spawn_transform)
+            if not vehicle:
+                print("SPAWN ERROR AT ", i)
+                self.world.debug.draw_string(spawn_transform.location,"spawn_fail_"+ str(i), False, carla.Color(200, 200, 0))
+            else:
+                #vehicle.set_autopilot(True, tm.get_port())
+                print(vehicle.id)
 
-            bg_list.append(vehicle)
+                if 'vehicle_speed_perc' in vehicle_config:
+                    tm.vehicle_percentage_speed_difference(
+                        vehicle, vehicle_config['vehicle_speed_perc'])
+                tm.auto_lane_change(vehicle, traffic_config['auto_lane_change'])
+                tm.ignore_lights_percentage(vehicle, 0)
+
+                bg_list.append(vehicle)
 
         return bg_list
 
@@ -990,17 +1081,21 @@ class ScenarioManager:
         """
         print('Spawning CARLA traffic flow.')
         traffic_config = self.scenario_params['carla_traffic_manager']
-        if port != 8000:
-            tm = self.client.get_trafficmanager(port)
+        if not self.scenario_params['EventsPath_Ego']:
+            if port != 8000:
+                tm = self.client.get_trafficmanager(port)
+            else:
+                tm = self.client.get_trafficmanager()
         else:
-            tm = self.client.get_trafficmanager()
+            tm = None
 
-        tm.set_global_distance_to_leading_vehicle(
-            traffic_config['global_distance'])
-        tm.set_synchronous_mode(traffic_config['sync_mode'])
-        tm.set_osm_mode(traffic_config['set_osm_mode'])
-        tm.global_percentage_speed_difference(
-            traffic_config['global_speed_perc'])
+        #tm.set_global_distance_to_leading_vehicle(
+        #    traffic_config['global_distance'])
+        #print("TM MODE: ",traffic_config['sync_mode'] )
+        #tm.set_synchronous_mode(traffic_config['sync_mode'])
+        #tm.set_osm_mode(traffic_config['set_osm_mode'])
+        #tm.global_percentage_speed_difference(
+        #    traffic_config['global_speed_perc'])
 
         bg_list = []
 

@@ -25,7 +25,7 @@ def is_vehicle_cococlass(label):
     Returns:
         -is_vehicle(bool): Whether this label belongs to the vehicle class
     """
-    vehicle_class_array = np.array([1, 2, 3, 5, 7], dtype=np.int)
+    vehicle_class_array = np.array([0, 1, 2, 3, 5, 7], dtype=np.int)
     return True if 0 in (label - vehicle_class_array) else False
 
 class BoundingBox(object):
@@ -99,7 +99,7 @@ class ObstacleVehicle(object):
     """
 
     def __init__(self, corners, o3d_bbx,
-                 vehicle=None, lidar=None, sumo2carla_ids=None, confidence=0.0):
+                 vehicle=None, lidar=None, sumo2carla_ids=None, confidence=0.0, label=None):
 
         self.o3d_obb = None
         if not vehicle:
@@ -112,6 +112,7 @@ class ObstacleVehicle(object):
             self.velocity = carla.Vector3D(0.0, 0.0, 0.0)
             self.yaw = 0.0
             self.confidence = confidence
+            self.label = label
         else:
             if sumo2carla_ids is None:
                 sumo2carla_ids = dict()
