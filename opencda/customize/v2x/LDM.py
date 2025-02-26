@@ -429,7 +429,7 @@ class LDM(object):
         if CPMobj.timestamp < self.LDM[id].getLatestPoint().timestamp - 100:  # Consider objects up to 100ms old
             print(f'CPMobj with id {CPMobj} is old')
             return
-
+        
         newLDMobj = Perception(CPMobj.xPosition,
                                CPMobj.yPosition,
                                CPMobj.width,

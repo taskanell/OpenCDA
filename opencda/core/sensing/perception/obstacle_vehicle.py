@@ -102,6 +102,7 @@ class ObstacleVehicle(object):
                  vehicle=None, lidar=None, sumo2carla_ids=None, confidence=0.0, label=None):
 
         self.o3d_obb = None
+        self.label = label
         if not vehicle:
             self.bounding_box = BoundingBox(corners)
             self.location = self.bounding_box.location
@@ -112,12 +113,13 @@ class ObstacleVehicle(object):
             self.velocity = carla.Vector3D(0.0, 0.0, 0.0)
             self.yaw = 0.0
             self.confidence = confidence
-            self.label = label
+            #self.label = label
         else:
             if sumo2carla_ids is None:
                 sumo2carla_ids = dict()
             self.set_vehicle(vehicle, lidar, sumo2carla_ids)
             self.confidence = 100.0  # They are ground truth perceptions
+            #self.label = label
 
     def get_transform(self):
         """
@@ -194,6 +196,7 @@ class ObstacleVehicle(object):
         # the vehicle controlled by sumo has speed 0 in carla,
         # thus we need to retrieve the correct number from sumo
         if len(sumo2carla_ids) > 0:
+            print("I AM HERE")
             sumo_speed = get_speed_sumo(sumo2carla_ids, self.carla_id)
             if sumo_speed > 0:
                 # todo: consider the yaw angle in the future

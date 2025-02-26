@@ -180,7 +180,7 @@ class ExtendedVehicleManager(VehicleManager):
 
         # print("Vehicle ", self.vehicle.id, " speed: ", ego_spd)
         # object detection
-        objects = self.perception_manager.detect(ego_pos)
+        objects = self.perception_manager.detect(ego_pos,role_name=self.role_name)
         print("Objects list: ",objects)
         self.sensorObjects = objects['vehicles']
         detected_n = len(objects['vehicles'])

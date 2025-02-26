@@ -263,6 +263,16 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
         for object_ in object_list:
             if object_.perception.line_set is not None:
                 geometry = object_.perception.line_set
+                print(f'object {object_.perception.id}')
+                if object_.perception.label == 0:
+                    geometry = scale_line_set(geometry, 5)
+                 # Calculate the centroid of the geometry points
+                points = np.asarray(geometry.points)
+                label_position = points.mean(axis=0)  # Centroid of the points
+                label_text = str(object_.perception.id)
+
+                # Add the label to the visualizer
+                vis.add_3d_label(label_position, label_text)
                 if object_.connected:
                     print('CONNECTED')
                     colors = [[0, 1, 0] for _ in range(12)]
@@ -324,6 +334,40 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
     for geometry in LDM_geometries:
         vis.remove_geometry(geometry)
 
+
+def scale_line_set(line_set, scale_factor):
+    """
+    Scale the points of a LineSet by a given factor.
+
+    Parameters
+    ----------
+    line_set : o3d.geometry.LineSet
+        The LineSet object to be scaled.
+
+    scale_factor : float
+        The factor by which to scale the points.
+
+    Returns
+    -------
+    scaled_line_set : o3d.geometry.LineSet
+        The scaled LineSet object.
+    """
+    # Get the points from the LineSet
+    points = np.asarray(line_set.points)
+
+    # Calculate the centroid of the points
+    centroid = np.mean(points, axis=0)
+
+    # Scale the points relative to the centroid
+    scaled_points = (points - centroid) * scale_factor + centroid
+
+    # Create a new LineSet with the scaled points
+    scaled_line_set = o3d.geometry.LineSet()
+    scaled_line_set.points = o3d.utility.Vector3dVector(scaled_points)
+    scaled_line_set.lines = line_set.lines
+    scaled_line_set.colors = line_set.colors
+
+    return scaled_line_set
 
 def test_rotation():
     box = [0, 0, 0, 3, 5, 2, np.deg2rad(45)]
@@ -408,10 +452,13 @@ def o3d_camera_lidar_fusion(objects,
     """
 
     # convert torch tensor to numpy array first
+    '''
     if yolo_bbx.is_cuda:
         yolo_bbx = yolo_bbx.cpu().detach().numpy()
     else:
         yolo_bbx = yolo_bbx.detach().numpy()
+    '''
+    yolo_bbx = yolo_bbx.detach().numpy()
 
     for i in range(yolo_bbx.shape[0]):
         detection = yolo_bbx[i]

@@ -115,6 +115,7 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         aAcceleration = actor.get_acceleration()
         returnValue = carla_pb2.Vehicle()
         returnValue.id = request.num
+        returnValue.rolename = actor.attributes['role_name']
         returnValue.location.x = aLocation.x
         returnValue.location.y = aLocation.y
         returnValue.location.z = aLocation.z
@@ -315,6 +316,8 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                             object.onSight = PO.onSight
                             object.tracked = PO.tracked
                             object.timestamp = int(1000 * (PO.getLatestPoint().timestamp - self.time_offset))
+                            object.label = PO.perception.label + 1
+                            print(f'2. obj with id {object.id} has label {object.label}')
                             object.confidence = PO.perception.confidence
                             if PO.perception.yaw < 0:
                                 object.yaw = PO.perception.yaw + 360
@@ -464,6 +467,12 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                 newPO.heading = request.object.yaw
                 newPO.yaw = request.object.yaw
                 newPO.id = request.object.id
+                if request.object.label == 0:
+                    newPO.label = None
+                else:
+                    newPO.label = request.object.label - 1
+                print(f'3. obj with id {newPO.id} has label {newPO.label}')
+                
                 toInsert = [newPO]
                 cav.ldm_mutex.acquire()
                 if request.object.detected:

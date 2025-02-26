@@ -16,6 +16,8 @@ import numpy as np
 import open3d as o3d
 import random
 
+import torch
+
 import opencda.core.sensing.perception.sensor_transformation as st
 from opencda.core.common.misc import \
     cal_distance_angle, get_speed, get_speed_sumo
@@ -610,7 +612,7 @@ class PerceptionManager:
         """
         return a.get_location().distance(self.ego_pos.location)
 
-    def detect(self, ego_pos):
+    def detect(self, ego_pos,role_name):
         """
         Detect surrounding objects. Currently only vehicle detection supported.
 
@@ -631,7 +633,7 @@ class PerceptionManager:
                    'traffic_lights': []}
 
         if not self.activate:
-            objects = self.deactivate_mode(objects)
+            objects = self.deactivate_mode(objects,role_name)
 
         else:
             objects = self.activate_mode(objects)
@@ -788,9 +790,15 @@ class PerceptionManager:
 
         # yolo detection
         init = time.time_ns()
-        yolo_detection = self.ml_manager.object_detector(rgb_images)
+        #return_obj = self.ml_manager.object_detector(rgb_images)
+        #print("ITEM: ",return_obj)
+        #yolo_detection = self.ml_manager.object_detector(rgb_images)
+        print("RGB IMAGES: ", rgb_images[0].shape)
+        _,yolo_detection,bboxes_inlane = torch.hub.load(self.ml_manager.src,'yolop', source ='local', mod = self.ml_manager.lane_and_da_detector, mod2=self.ml_manager.object_detector,\
+                                image=rgb_images[0], device=self.ml_manager.device,draw_bb_line=False)
         yolo_time = time.time_ns()
-        #print('yolo detection time [ms]: ' + str((yolo_time - init) / 1e6))
+        print('yolo detection time [ms]: ' + str((yolo_time - init) / 1e6))
+        print("IN LANE BBOXES: ",bboxes_inlane)
         # rgb_images for drawing
         rgb_draw_images = []
 
@@ -880,7 +888,7 @@ class PerceptionManager:
         #print('Matching time [ms]: ' + str((time.time_ns() - fusion_time) / 1e6))
         return objects
 
-    def deactivate_mode(self, objects):
+    def deactivate_mode(self, objects,role_name):
         """
         Object detection using server information directly.
 
@@ -898,7 +906,9 @@ class PerceptionManager:
         """
         world = self.carla_world
 
-        vehicle_list = world.get_actors().filter("*vehicle*")
+        vehicle_list = list(world.get_actors().filter("*vehicle*"))
+        pedestrian_list = list(world.get_actors().filter("*walker*")) 
+        #vehicle_list = vehicle_list + pedestrian_list
         # todo: hard coded
         thresh = 30 if not self.data_dump else 30
 
@@ -918,7 +928,16 @@ class PerceptionManager:
                     None,
                     v,
                     self.lidar.sensor,
-                    self.cav_world.sumo2carla_ids) for v in vehicle_list]
+                    self.cav_world.sumo2carla_ids,label=1) for v in vehicle_list]
+            if role_name != 'ego':
+                pedestrian_list = [
+                    ObstacleVehicle(
+                        None,
+                        None,
+                        v,
+                        self.lidar.sensor,
+                        self.cav_world.sumo2carla_ids,label=0) for v in pedestrian_list]
+            
         else:
             vehicle_list = [
                 ObstacleVehicle(
@@ -927,7 +946,10 @@ class PerceptionManager:
                     v,
                     None,
                     self.cav_world.sumo2carla_ids) for v in vehicle_list]
-
+        # add the pedestrian list to the ego's perception only if the role name is not ego
+        # useful for the CAVs to detect pedestrians with GT data
+        if role_name != 'ego':
+            vehicle_list = vehicle_list + pedestrian_list
         objects.update({'vehicles': vehicle_list})
 
         if self.camera_visualize:
@@ -946,14 +968,14 @@ class PerceptionManager:
                                                                rgb_image,
                                                                i)
                 # resize to make it fittable to the screen
-                rgb_image = cv2.resize(rgb_image, (0, 0), fx=0.4, fy=0.4)
+                rgb_image = cv2.resize(rgb_image, (0, 0), fx=0.7, fy=0.7)
 
                 # show image using cv2
                 cv2.imshow(
                     '%s camera of actor %d, perception deactivated' %
                     (names[i], self.id), rgb_image)
                 cv2.waitKey(1)
-
+        '''
         if self.lidar_visualize:
             while self.lidar.data is None:
                 continue
@@ -964,6 +986,7 @@ class PerceptionManager:
                 self.count,
                 self.lidar.o3d_pointcloud,
                 objects)
+        '''
 
         # add traffic light
         objects = self.retrieve_traffic_lights(objects)
