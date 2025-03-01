@@ -196,7 +196,6 @@ class ObstacleVehicle(object):
         # the vehicle controlled by sumo has speed 0 in carla,
         # thus we need to retrieve the correct number from sumo
         if len(sumo2carla_ids) > 0:
-            print("I AM HERE")
             sumo_speed = get_speed_sumo(sumo2carla_ids, self.carla_id)
             if sumo_speed > 0:
                 # todo: consider the yaw angle in the future

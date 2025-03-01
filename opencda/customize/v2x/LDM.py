@@ -410,6 +410,7 @@ class LDM(object):
                 continue
             # newID = self.LDM_ids.pop() # TODO: solve ms-van3t api resulting in changing POids from same cav
             newID = CPMobj.id
+            print(f'2. New ID: {newID}')
             self.LDM[newID] = newLDMentry(CPMobj, newID, connected=False, onSight=False)
             print(f'CPM OBJ {CPMobj.id} HAS CPM FLAG TRUE')
             self.LDM[newID].CPM = True
@@ -427,7 +428,7 @@ class LDM(object):
         if fromID not in self.LDM[id].perceivedBy:
             self.LDM[id].perceivedBy.append(fromID)
         if CPMobj.timestamp < self.LDM[id].getLatestPoint().timestamp - 100:  # Consider objects up to 100ms old
-            print(f'CPMobj with id {CPMobj} is old')
+            print(f'CPMobj with id {CPMobj.id} is old')
             return
         
         newLDMobj = Perception(CPMobj.xPosition,
@@ -490,7 +491,7 @@ class LDM(object):
                                                             newLDMobj.length,
                                                             newLDMobj.yaw)
         # cav.LDM[id].kalman_filter.update(newLDMobj.xPosition, newLDMobj.yPosition, newLDMobj.width, newLDMobj.length)
-        print(f'CPMobj with id {CPMobj} in appendCMPobj')
+        print(f'CPMobj with id {CPMobj.id} in appendCMPobj')
         self.LDM[id].insertPerception(newLDMobj)
         self.LDM[id].CPM = True
 

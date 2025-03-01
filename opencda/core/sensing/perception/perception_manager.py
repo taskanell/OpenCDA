@@ -908,7 +908,6 @@ class PerceptionManager:
 
         vehicle_list = list(world.get_actors().filter("*vehicle*"))
         pedestrian_list = list(world.get_actors().filter("*walker*")) 
-        #vehicle_list = vehicle_list + pedestrian_list
         # todo: hard coded
         thresh = 30 if not self.data_dump else 30
 

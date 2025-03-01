@@ -43,7 +43,6 @@ def run_scenario(opt, scenario_params):
         single_cav_list = \
             scenario_manager.create_vehicle_manager(application=['single'],log_dir='/tmp')
 
-        print('I AM HERE')
 
         # create background traffic in carla
         traffic_manager, bg_veh_list = \
@@ -92,7 +91,7 @@ def run_scenario(opt, scenario_params):
             #        90)))
 
             for i, single_cav in enumerate(single_cav_list):
-                print('RUNNING')
+                #print('RUNNING')
                 single_cav.update_info_LDM()
                 ego_pos=single_cav.localizer.get_ego_pos().location
                 #print("EGO_POS: ", ego_pos)

@@ -266,19 +266,18 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
                 print(f'object {object_.perception.id}')
                 if object_.perception.label == 0:
                     geometry = scale_line_set(geometry, 5)
-                 # Calculate the centroid of the geometry points
+                # Find the centroid of the points to place the label
                 points = np.asarray(geometry.points)
-                label_position = points.mean(axis=0)  # Centroid of the points
+                label_position = points.mean(axis=0) 
+                # Add the label to the centroid
                 label_text = str(object_.perception.id)
-
-                # Add the label to the visualizer
-                vis.add_3d_label(label_position, label_text)
+                geometry_label = text_3d(label_text, label_position, degree=-90.0 ,font_size=250)
                 if object_.connected:
                     print('CONNECTED')
                     colors = [[0, 1, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
                 elif not object_.connected and object_.onSight and object_.tracked:
-                    print('TRACKED')
+                    print('ON SIGHT AND TRACKED')
                     colors = [[1, 0, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
                 elif not object_.connected and not object_.onSight and object_.CPM:
@@ -286,10 +285,14 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
                     colors = [[1, 0.6, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
                 elif not object_.connected and not object_.onSight and object_.tracked:
+                    print('OFF SIGHT AND TRACKED')
                     colors = [[0.7, 0, 0] for _ in range(12)]
                     geometry.colors = o3d.utility.Vector3dVector(colors)
                 else:
                     continue
+                # Add geometry_labels to the LDM visualizer
+                vis.add_geometry(geometry_label)
+                LDM_geometries.append(geometry_label)
             else:
                 geometry = object_.perception.o3d_bbx
                 if object_.connected:
@@ -315,7 +318,9 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
             LDM_geometries.append(geometry)
 
     # vis.add_geometry(test_rotation())
-
+    #text_cloud = text_3d("Hello Open3D", pos=[0, 0, 0],degree=-90.0, font_size=120)
+    #vis.add_geometry(text_cloud)
+    '''
     for key, object_list in groundTruth.items():
         # we only draw vehicles for now
         if key != 'vehicles':
@@ -325,6 +330,7 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
             geometry.color = (0.3, 0.3, 0.3)
             vis.add_geometry(geometry)
             LDM_geometries.append(geometry)
+    '''
 
     vis.poll_events()
     vis.update_renderer()
@@ -333,6 +339,54 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
 
     for geometry in LDM_geometries:
         vis.remove_geometry(geometry)
+    #vis.remove_geometry(text_cloud)    
+
+
+def text_3d(text, pos, direction=None, degree=0.0, font_size=16):
+    """
+    Generate a 3D text point cloud used for visualization.
+    :param text: content of the text
+    :param pos: 3D xyz position of the text upper left corner
+    :param direction: 3D normalized direction of where the text faces
+    :param degree: in plane rotation of text
+    :param font: Name of the font - change it according to your system
+    :param font_size: size of the font
+    :return: o3d.geoemtry.PointCloud object
+    """
+    if direction is None:
+        direction = (0., 0., 1.)
+
+    from PIL import Image, ImageFont, ImageDraw
+    from pyquaternion import Quaternion
+
+    #font_obj = ImageFont.truetype(font, font_size)
+    font_obj = ImageFont.load_default()
+    font_dim = font_obj.getsize(text)
+
+    img = Image.new('RGB', font_dim, color=(0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.text((0, 0), text, font=font_obj, fill=(255, 255, 255))
+    img = np.asarray(img)
+
+    img_mask = (img[:, :, 0] > 200) & (img[:, :, 1] > 200) & (img[:, :, 2] > 200)  # Detect white text
+    indices = np.indices([*img.shape[:2], 1])[:, img_mask, 0].reshape(3, -1).T
+
+    #img_mask = img[:, :, 0] < 128
+    #indices = np.indices([*img.shape[0:2], 1])[:, img_mask, 0].reshape(3, -1).T
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.colors = o3d.utility.Vector3dVector(np.tile([1, 1, 1], (len(indices), 1)))  # Set text color to blue
+    #pcd.colors = o3d.utility.Vector3dVector(img[img_mask, :].astype(float) / 255.0)
+    pcd.points = o3d.utility.Vector3dVector(indices / 5.0)
+
+    raxis = np.cross([0.0, 0.0, 1.0], direction)
+    if np.linalg.norm(raxis) < 1e-6:
+        raxis = (0.0, 0.0, 1.0)
+    trans = (Quaternion(axis=raxis, radians=np.arccos(direction[2])) *
+             Quaternion(axis=direction, degrees=degree)).transformation_matrix
+    trans[0:3, 3] = np.asarray(pos)
+    pcd.transform(trans)
+    return pcd
 
 
 def scale_line_set(line_set, scale_factor):

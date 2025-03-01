@@ -4,7 +4,7 @@ import copy
 
 def newLDMentry(perception, id, connected=False, onSight=True):
     # Function to create a new LDMentry from a perception
-    print(f'OBJ {id} has label {perception.label}')
+    #print(f'OBJ {id} has label {perception.label}')
     retEntry = LDMentry(id, perception.xPosition, perception.yPosition, perception.width, perception.length,
                         perception.timestamp, perception.confidence, xSpeed=perception.xSpeed, ySpeed=perception.ySpeed,
                         heading=perception.heading, connected=connected, o3d_bbx=perception.o3d_bbx, onSight=True, label=perception.label)
@@ -26,7 +26,7 @@ class LDMentry:
     def __init__(self, id, xPosition, yPosition, width, length, timestamp, confidence, xSpeed=0, ySpeed=0, heading=0,
                  connected=False, o3d_bbx=None, onSight=True, label=None):
         self.perception = Perception(xPosition, yPosition, width, length, timestamp, confidence,
-                                     xSpeed=xSpeed, ySpeed=ySpeed, heading=heading, o3d_bbx=o3d_bbx, label=label)
+                                     xSpeed=xSpeed, ySpeed=ySpeed, heading=heading, o3d_bbx=o3d_bbx, ID=id ,label=label)  # added ID because it was missing and caused LDMvis to have ID = None
         self.perception.connected = connected
         if label == 0:
             maxlen = 4

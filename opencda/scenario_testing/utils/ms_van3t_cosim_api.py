@@ -302,7 +302,7 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                             if PO.CPM and len(PO.perceivedBy) == 0:
                                 #print("CONTINUE FOR ID:",PO.id)
                                 continue  # TODO understand why this happens --> it happens because CPM fusion does not set this value
-                            #CUSTOM ROS MESSAGE CREATION
+                            # maybe TODO here: CUSTOM ROS MESSAGE CREATION
                             object.dx = PO.perception.xPosition - ego_pos.location.x
                             object.dy = PO.perception.yPosition - ego_pos.location.y
                             object.speed.x = PO.perception.xSpeed
@@ -316,8 +316,8 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                             object.onSight = PO.onSight
                             object.tracked = PO.tracked
                             object.timestamp = int(1000 * (PO.getLatestPoint().timestamp - self.time_offset))
-                            object.label = PO.perception.label + 1
-                            print(f'2. obj with id {object.id} has label {object.label}')
+                            object.label = PO.perception.label + 1  #increasing label by 1 to match ns-3 side labels (in protobuf's params 0 value means no value taken yet)
+                            #print(f'2. obj with id {object.id} has label {object.label}')
                             object.confidence = PO.perception.confidence
                             if PO.perception.yaw < 0:
                                 object.yaw = PO.perception.yaw + 360
@@ -470,8 +470,8 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                 if request.object.label == 0:
                     newPO.label = None
                 else:
-                    newPO.label = request.object.label - 1
-                print(f'3. obj with id {newPO.id} has label {newPO.label}')
+                    newPO.label = request.object.label - 1  #in OpenCDA side, labels:{0:ped,1:veh}
+                #print(f'3. obj with id {newPO.id} has label {newPO.label}')
                 
                 toInsert = [newPO]
                 cav.ldm_mutex.acquire()

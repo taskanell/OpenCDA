@@ -275,7 +275,7 @@ class ExtendedVehicleManager(VehicleManager):
             LDMobj.yaw = curr_wpt.transform.rotation.yaw
             LDMobj.id = obj.carla_id
             returnedObjects.append(LDMobj)
-            print(f'TRANSLATED LDM OBJ: {obj.label}')
+            print(f'TRANSLATED LDM OBJ: {obj.label} with id {obj.carla_id}')
         return {'vehicles': returnedObjects}
 
     def getInfo(self):
