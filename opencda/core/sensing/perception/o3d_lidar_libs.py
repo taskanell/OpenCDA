@@ -58,19 +58,33 @@ def transform_lidar_to_vehicle_frame(points, vehicle_transform):
     :return: Transformed Nx3 numpy array.
     """
     # Get rotation and location
-    #location = vehicle_transform.location
-    #location = vehicle_transform.location
-    location = carla.Location(0,0,0)
-    #rotation = vehicle_transform.rotation
-    rotation = carla.Rotation(0,0,0)
+    location = vehicle_transform.location
+    rotation = vehicle_transform.rotation
 
     # Create rotation matrix from yaw
     yaw = np.radians(rotation.yaw)
-    rotation_matrix = np.array([
+    pitch = np.radians(rotation.pitch)
+    roll = np.radians(rotation.roll)
+
+    rotation_matrix_yaw = np.array([
         [np.cos(yaw), -np.sin(yaw), 0],
         [np.sin(yaw), np.cos(yaw), 0],
         [0, 0, 1]
     ])
+
+    rotation_matrix_pitch = np.array([
+        [np.cos(pitch), 0, np.sin(pitch)],
+        [0, 1, 0],
+        [-np.sin(pitch), 0, np.cos(pitch)]
+    ])
+
+    rotation_matrix_roll = np.array([
+        [1, 0, 0],
+        [0, np.cos(roll), -np.sin(roll)],
+        [0, np.sin(roll), np.cos(roll)]
+    ])
+
+    rotation_matrix = np.dot(np.dot(rotation_matrix_yaw, rotation_matrix_pitch), rotation_matrix_roll)
 
     # Translate and rotate points
     translated_points = points - np.array([location.x, location.y, location.z])
@@ -264,8 +278,10 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
             if object_.perception.line_set is not None:
                 geometry = object_.perception.line_set
                 print(f'object {object_.perception.id}')
-                if object_.perception.label == 0:
-                    geometry = scale_line_set(geometry, 5)
+                # TODO : scale the line set when needed (mainly in GT perception for Peds) - for now uncomment when GT Perception enabled
+                # TODO : fix the bug with None id given sometimes, recognize why it happens 
+                #if object_.perception.label == 0:
+                #    geometry = scale_line_set(geometry, 5)
                 # Find the centroid of the points to place the label
                 points = np.asarray(geometry.points)
                 label_position = points.mean(axis=0) 
@@ -320,6 +336,8 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
     # vis.add_geometry(test_rotation())
     #text_cloud = text_3d("Hello Open3D", pos=[0, 0, 0],degree=-90.0, font_size=120)
     #vis.add_geometry(text_cloud)
+
+    # Uncomment to visualize ground truth
     '''
     for key, object_list in groundTruth.items():
         # we only draw vehicles for now
@@ -341,7 +359,82 @@ def o3d_visualizer_showLDM(vis, count, point_cloud, objects, groundTruth):
         vis.remove_geometry(geometry)
     #vis.remove_geometry(text_cloud)    
 
+# TODO: Add YOLO Accuracy metric to measure FPs and FNs
 
+def calculate_yolo_accuracy(detections, ground_truths, iou_threshold=0.5):
+    """
+    Calculate YOLO accuracy metrics including False Positives (FPs) and False Negatives (FNs).
+
+    Parameters
+    ----------
+    detections : list
+        List of detected bounding boxes, each represented as [x1, y1, x2, y2, confidence, class].
+
+    ground_truths : list
+        List of ground truth bounding boxes, each represented as [x1, y1, x2, y2, class].
+
+    iou_threshold : float
+        Intersection over Union (IoU) threshold to consider a detection as True Positive.
+
+    Returns
+    -------
+    metrics : dict
+        Dictionary containing the number of True Positives (TP), False Positives (FP), and False Negatives (FN).
+    """
+    def iou(box1, box2):
+        """
+        Calculate the Intersection over Union (IoU) of two bounding boxes.
+
+        Parameters
+        ----------
+        box1 : list
+            Bounding box represented as [x1, y1, x2, y2].
+
+        box2 : list
+            Bounding box represented as [x1, y1, x2, y2].
+
+        Returns
+        -------
+        float
+            IoU value.
+        """
+        x1 = max(box1[0], box2[0])
+        y1 = max(box1[1], box2[1])
+        x2 = min(box1[2], box2[2])
+        y2 = min(box1[3], box2[3])
+
+        intersection = max(0, x2 - x1) * max(0, y2 - y1)
+        box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+        box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+        union = box1_area + box2_area - intersection
+
+        return intersection / union
+
+    TP = 0
+    FP = 0
+    FN = 0
+
+    detected = []
+
+    for gt in ground_truths:
+        matched = False
+        for det in detections:
+            if det in detected:
+                continue
+            if iou(gt[:4], det[:4]) >= iou_threshold and gt[4] == det[5]:
+                TP += 1
+                detected.append(det)
+                matched = True
+                break
+        if not matched:
+            FN += 1
+
+    FP = len(detections) - len(detected)
+
+    return {'TP': TP, 'FP': FP, 'FN': FN}
+
+
+# TODO: Check the github issue for increasing the density of the text!
 def text_3d(text, pos, direction=None, degree=0.0, font_size=16):
     """
     Generate a 3D text point cloud used for visualization.
@@ -365,17 +458,17 @@ def text_3d(text, pos, direction=None, degree=0.0, font_size=16):
 
     img = Image.new('RGB', font_dim, color=(0, 0, 0))
     draw = ImageDraw.Draw(img)
-    draw.text((0, 0), text, font=font_obj, fill=(255, 255, 255))
+    draw.text((0, 0), text, font=font_obj, fill=(255, 255, 0)) #white text --> 255,255,255
     img = np.asarray(img)
 
-    img_mask = (img[:, :, 0] > 200) & (img[:, :, 1] > 200) & (img[:, :, 2] > 200)  # Detect white text
+    img_mask = (img[:, :, 0] > 200) & (img[:, :, 1] > 200) & (img[:, :, 2] < 100)  # Detect yellow text (white --> > 200 third condition)
     indices = np.indices([*img.shape[:2], 1])[:, img_mask, 0].reshape(3, -1).T
 
     #img_mask = img[:, :, 0] < 128
     #indices = np.indices([*img.shape[0:2], 1])[:, img_mask, 0].reshape(3, -1).T
 
     pcd = o3d.geometry.PointCloud()
-    pcd.colors = o3d.utility.Vector3dVector(np.tile([1, 1, 1], (len(indices), 1)))  # Set text color to blue
+    pcd.colors = o3d.utility.Vector3dVector(np.tile([1, 1, 0], (len(indices), 1))) #yellow text --> 1,1,1
     #pcd.colors = o3d.utility.Vector3dVector(img[img_mask, :].astype(float) / 255.0)
     pcd.points = o3d.utility.Vector3dVector(indices / 5.0)
 
@@ -506,13 +599,13 @@ def o3d_camera_lidar_fusion(objects,
     """
 
     # convert torch tensor to numpy array first
-    '''
+    
     if yolo_bbx.is_cuda:
         yolo_bbx = yolo_bbx.cpu().detach().numpy()
     else:
         yolo_bbx = yolo_bbx.detach().numpy()
-    '''
-    yolo_bbx = yolo_bbx.detach().numpy()
+    
+    ##yolo_bbx = yolo_bbx.detach().numpy()
 
     for i in range(yolo_bbx.shape[0]):
         detection = yolo_bbx[i]
@@ -584,8 +677,8 @@ def o3d_camera_lidar_fusion(objects,
         corner = corner.transpose()[:, :3]
 
         if is_vehicle_cococlass(label):
-            pedestrian = label if label==0 else None
-            obstacle_vehicle = ObstacleVehicle(corner, aabb, confidence=confidence,label=pedestrian)
+            label = label if label==0 else 1
+            obstacle_vehicle = ObstacleVehicle(corner, aabb, confidence=confidence,label=label)
             if obb is not None:
                 obstacle_vehicle.o3d_obb = obb
                 obstacle_vehicle.bounding_box.extent.x = obb.extent[0]/2
@@ -605,7 +698,7 @@ def o3d_camera_lidar_fusion(objects,
         # todo: refine the category
         # we regard or other obstacle rather than vehicle as static class
         else:
-            static_obstacle = StaticObstacle(corner, aabb)
+            static_obstacle = StaticObstacle(corner, aabb, label)
             if 'static' in objects:
                 objects['static'].append(static_obstacle)
             else:

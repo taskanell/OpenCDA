@@ -180,8 +180,10 @@ class ExtendedVehicleManager(VehicleManager):
 
         # print("Vehicle ", self.vehicle.id, " speed: ", ego_spd)
         # object detection
-        objects = self.perception_manager.detect(ego_pos,role_name=self.role_name)
-        print("Objects list: ",objects)
+        objects, clf_metrics = self.perception_manager.detect(ego_pos,role_name=self.role_name)
+        #objects = self.perception_manager.detect(ego_pos,role_name=self.role_name)
+        #print("Objects list: ",objects)
+        #print("Metrics ", clf_metrics)
         self.sensorObjects = objects['vehicles']
         detected_n = len(objects['vehicles'])
         file_detection = (time.time_ns() / 1000) - file_timestamp
@@ -196,7 +198,8 @@ class ExtendedVehicleManager(VehicleManager):
             self.pldm_mutex.release()
         elif not self.pldm:
             self.ldm_mutex.acquire()
-            self.LDM.updateLDM(self.translateDetections(objects))
+            #clf_metrics = {}
+            self.LDM.updateLDM(self.translateDetections(objects),clf_metrics)
             objects = self.LDM.LDM2OpencdaObj(objects['traffic_lights'])
             self.ldm_mutex.release()
         file_localFusion = ((time.time_ns() / 1000) - file_detection - file_timestamp)

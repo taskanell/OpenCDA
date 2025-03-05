@@ -36,6 +36,7 @@ class LDM(object):
             log=True
     ):
         self.LDM = {}
+        self.clf_metrics={}
         self.CPM_buffer = {}
         self.LDM_ids = set(range(1, 65536))  # ID pool
         self.cav = cav
@@ -91,8 +92,9 @@ class LDM(object):
             return IoU_map, new, matched, ldm_ids
         return None, None, None, None
 
-    def updateLDM(self, object_list):
+    def updateLDM(self, object_list, metrics):
         # Predict position of current LDM tracks before attempting to match
+        self.clf_metrics = metrics
         for ID, LDMobj in self.LDM.items():
             # diff = self.cav.time - LDMobj.perception.timestamp
             self.LDM[ID].onSight = False  # It will go back to True when appending if we match it
@@ -163,6 +165,7 @@ class LDM(object):
             o3d_pointcloud_encode(self.cav.localizer.get_ego_pos(),
                                   self.cav.perception_manager.lidar.data,
                                   self.cav.perception_manager.lidar.o3d_pointcloud)
+            print('LDM VISUALIZATION of cav ', self.cav.vehicle.id) 
             if self.cav.lidar_visualize:
                 o3d_visualizer_showLDM(
                     self.o3d_vis,
@@ -303,6 +306,9 @@ class LDM(object):
         for obj in sorted_list[:10]:
             cpm[obj[1]] = self.LDM[obj[1]]
         return cpm
+    
+    def get_clf_metrics(self):
+        return self.clf_metrics
 
     def getAllPOs(self):
         POs = []

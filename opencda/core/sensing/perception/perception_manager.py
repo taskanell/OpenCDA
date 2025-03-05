@@ -631,16 +631,19 @@ class PerceptionManager:
 
         objects = {'vehicles': [],
                    'traffic_lights': []}
+        
+        self.count += 1
 
         if not self.activate:
             objects = self.deactivate_mode(objects,role_name)
+            return objects
 
         else:
-            objects = self.activate_mode(objects)
+            objects, clf_metrics = self.activate_mode(objects)
+            #print(f'metrics: {clf_metrics}')
+            return objects, clf_metrics
 
-        self.count += 1
-
-        return objects
+        #return objects
 
     def radar_detect(self, objects):
 
@@ -790,15 +793,15 @@ class PerceptionManager:
 
         # yolo detection
         init = time.time_ns()
-        #return_obj = self.ml_manager.object_detector(rgb_images)
-        #print("ITEM: ",return_obj)
-        #yolo_detection = self.ml_manager.object_detector(rgb_images)
-        print("RGB IMAGES: ", rgb_images[0].shape)
-        _,yolo_detection,bboxes_inlane = torch.hub.load(self.ml_manager.src,'yolop', source ='local', mod = self.ml_manager.lane_and_da_detector, mod2=self.ml_manager.object_detector,\
-                                image=rgb_images[0], device=self.ml_manager.device,draw_bb_line=False)
+        ##return_obj = self.ml_manager.object_detector(rgb_images)
+        ##print("ITEM: ",return_obj)
+        yolo_detection = self.ml_manager.object_detector(rgb_images)
+        ##print("RGB IMAGES: ", rgb_images[0].shape)
+        ##_,yolo_detection,bboxes_inlane = torch.hub.load(self.ml_manager.src,'yolop', source ='local', mod = self.ml_manager.lane_and_da_detector, mod2=self.ml_manager.object_detector,\
+        ##                        image=rgb_images[0], device=self.ml_manager.device,draw_bb_line=False)
         yolo_time = time.time_ns()
-        print('yolo detection time [ms]: ' + str((yolo_time - init) / 1e6))
-        print("IN LANE BBOXES: ",bboxes_inlane)
+        #print('yolo detection time [ms]: ' + str((yolo_time - init) / 1e6))
+        #print("IN LANE BBOXES: ",bboxes_inlane)
         # rgb_images for drawing
         rgb_draw_images = []
 
@@ -829,8 +832,8 @@ class PerceptionManager:
 
             # calculate the speed. current we retrieve from the server
             # directly.
-
-            self.speed_retrieve(objects)
+            # THIS WORKS ONLY FOR ONE CAMERA!!
+            metrics_dict = self.speed_retrieve_and_classify_metrics(objects)
 
         self.radar_detect(objects)
 
@@ -849,7 +852,7 @@ class PerceptionManager:
                     (str(i), self.id), rgb_image)
             cv2.waitKey(1)
 
-        objects['vehicles'] = [item for item in objects['vehicles'] if item.confidence >= 0.7 or (item.label==0 and item.confidence >= 0.51)] #or (item.label==0 and item.confidence>=0.3)] #if (item.confidence >= 0.7) or 
+        objects['vehicles'] = [item for item in objects['vehicles'] if item.confidence >= 0.7 or (item.label==0 and item.confidence >= 0.35)] #or (item.label==0 and item.confidence>=0.3)] #if (item.confidence >= 0.7) or 
         print(f'SENT OBJS: {objects}')
         duplicate_indices = set()
         # Iterate through the objects to check for duplicates
@@ -884,9 +887,12 @@ class PerceptionManager:
         # add traffic light
         objects = self.retrieve_traffic_lights(objects)
         self.objects = objects
+        for obj in objects['vehicles']:
+            if obj.carla_id == -1:
+                print(f'NOT CARLA ID OBJ WITH LABEL {obj.label}')
 
         #print('Matching time [ms]: ' + str((time.time_ns() - fusion_time) / 1e6))
-        return objects
+        return objects, metrics_dict
 
     def deactivate_mode(self, objects,role_name):
         """
@@ -1113,7 +1119,7 @@ class PerceptionManager:
 
         return rgb_image
 
-    def speed_retrieve(self, objects):
+    def speed_retrieve_and_classify_metrics(self, objects):
         """
         We don't implement any obstacle speed calculation algorithm.
         The speed will be retrieved from the server directly.
@@ -1128,24 +1134,48 @@ class PerceptionManager:
 
         world = self.carla_world
         vehicle_list = world.get_actors().filter("*vehicle*")
-        vehicle_list = [v for v in vehicle_list if self.dist(v) < 50 and
+        vehicle_list = [v for v in vehicle_list if self.dist(v) < 100 and
                         v.id != self.id]
+        # TODO: have a better check for more than one pedestrian
+        ped = world.get_actors().filter("walker.pedestrian*")
+        det_ped = 0
+        appended_ids = []
+        num_of_peds = len(list(ped))
+        num_of_vehs = len(list(vehicle_list))
+        total_actors = num_of_peds+num_of_vehs
+        num_of_detobj = len(objects['vehicles'])
+
+        if objects.get('static', []):
+            num_of_detobj += len(objects['static']) 
+        TP = 0
+        FN = 0
 
         # todo: consider the minimum distance to be safer in next version
         for v in vehicle_list:
             loc = v.get_location()
             for obstacle_vehicle in objects['vehicles']:
-                if obstacle_vehicle.label == 0:
-                    ped = world.get_actors().filter("walker.pedestrian*")[0]
-                    print(f'ped label {ped.id}')
-                    obstacle_vehicle.set_carla_id(ped.id)
-                    continue
                 obstacle_speed = get_speed(obstacle_vehicle)
                 # if speed > 0, it represents that the vehicle
                 # has been already matched.
-                if obstacle_speed > 0:
+                # TODO: Investigate if this tactic is efficient. If the vehicle is stable, it would propably return zero speed.
+                # It also adds carla id value with hard coded distance of gt vehicle to detected object (less than 3) --> efficient?
+                if obstacle_speed > 0: 
+                    print(f'already matched {obstacle_vehicle.carla_id}')
                     continue
                 obstacle_loc = obstacle_vehicle.get_location()
+                # TODO : For more than one pedestrian i should have a check too to give id based on distance (i avoid it for now because i get None id values for peds sometimes)
+                if obstacle_vehicle.label == 0:
+                    print(f'ped id detected')
+                    if det_ped<num_of_peds:
+                        det_ped += 1
+                        ped_id = ped[0].id
+                        TP+=1
+                    else:
+                        if obstacle_vehicle.carla_id == -1:
+                            print(f'already matched ped id {ped_id}')
+                    obstacle_vehicle.set_carla_id(ped[0].id)
+                    #continue
+                print(f'VALUE X: {abs(loc.x - obstacle_loc.x)}, VALUE Y: {abs(loc.y - obstacle_loc.y)} for {obstacle_vehicle.label}')
                 if abs(loc.x - obstacle_loc.x) <= 3.0 and \
                         abs(loc.y - obstacle_loc.y) <= 3.0:
                     obstacle_vehicle.set_velocity(v.get_velocity())
@@ -1161,7 +1191,27 @@ class PerceptionManager:
                             speed_vector = carla.Vector3D(sumo_speed, 0, 0)
                             obstacle_vehicle.set_velocity(speed_vector)
 
-                    obstacle_vehicle.set_carla_id(v.id)  
+                    obstacle_vehicle.set_carla_id(v.id)
+                    if v.id not in appended_ids:
+                        appended_ids.append(v.id)
+                        print(f"GIVEN ID {v.id}")
+                        TP+=1
+        
+        if objects.get('static', []):
+            print(f"static obj: {len(objects['static'])}")
+            for v in vehicle_list:
+                if v.id not in appended_ids:
+                    for obstacle_vehicle in objects['static']:
+                            obstacle_loc = obstacle_vehicle.get_location()
+                            if abs(loc.x - obstacle_loc.x) <= 3.0 and \
+                            abs(loc.y - obstacle_loc.y) <= 3.0:
+                                print(f'Object with label {obstacle_vehicle.label} FN')
+                                FN += 1
+
+        
+        print(f'FP:{num_of_detobj-TP}, TP:{TP}, FN:{FN}, TotalDetections:{num_of_detobj}, TotalActors:{total_actors}')
+        return {'TP': TP, 'FP': num_of_detobj-TP, 'FN': FN, 'TotalDetections':num_of_detobj, 'TotalActors':total_actors}
+                      
 
     def retrieve_traffic_lights(self, objects):
         """

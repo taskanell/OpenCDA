@@ -101,9 +101,12 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         self.world.get_actors()
         actor_list = self.world.get_actors()
         vehicles = actor_list.filter('vehicle.*')
+        pedestrians = actor_list.filter('walker.*')
         returnValue = carla_pb2.ActorIds()
         for vehicle in vehicles:
             returnValue.actorId.append(vehicle.id)
+        for pedestrian in pedestrians:
+            returnValue.actorId.append(pedestrian.id)
         return returnValue
 
     def GetManagedActorById(self, request, context):
@@ -293,6 +296,10 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                 if cav.LDM is not None:
                     ego_pos, ego_spd, objects = cav.getInfo()
                     returnValue = carla_pb2.Objects()
+                    #if cav.clf_metrics:
+                    print(f'gotten metrics: {cav.LDM.get_clf_metrics()}')
+                    returnValue.metrics.update(cav.LDM.get_clf_metrics())
+                    #returnValue.metrics = cav.LDM.get_clf_metrics()
                     for PO in cav.LDM.getAllPOs():
                         print(f'PO ID: {PO.id}')
                         if (not PO.connected and PO.tracked and PO.onSight) or PO.CPM:
@@ -317,7 +324,7 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                             object.tracked = PO.tracked
                             object.timestamp = int(1000 * (PO.getLatestPoint().timestamp - self.time_offset))
                             object.label = PO.perception.label + 1  #increasing label by 1 to match ns-3 side labels (in protobuf's params 0 value means no value taken yet)
-                            #print(f'2. obj with id {object.id} has label {object.label}')
+                            print(f'2. obj with id {object.id} has label {object.label}')
                             object.confidence = PO.perception.confidence
                             if PO.perception.yaw < 0:
                                 object.yaw = PO.perception.yaw + 360
@@ -376,6 +383,13 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         for actor in self.world.get_actors().filter("*vehicle*"):
             id_x = actor.id
             vehicle_list[id_x] = actor
+        #add pedestrians to the gt ids
+        pedestrian_list = {}
+        for actor in self.world.get_actors().filter("*walker*"):
+            id_x = actor.id
+            pedestrian_list[id_x] = actor
+        # TODO: have a distinction between vehicles and pedestrians (propably needed for more clear code and calculations)
+        vehicle_list.update(pedestrian_list)
 
         if request.id in vehicle_list:
             gt = vehicle_list[request.id]
@@ -471,7 +485,7 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
                     newPO.label = None
                 else:
                     newPO.label = request.object.label - 1  #in OpenCDA side, labels:{0:ped,1:veh}
-                #print(f'3. obj with id {newPO.id} has label {newPO.label}')
+                print(f'3. obj with id {newPO.id} has label {newPO.label}') #will get label None for connected vehicles only (CAService not modified - not essential yet)
                 
                 toInsert = [newPO]
                 cav.ldm_mutex.acquire()

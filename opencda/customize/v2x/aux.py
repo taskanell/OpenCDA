@@ -29,7 +29,7 @@ class LDMentry:
                                      xSpeed=xSpeed, ySpeed=ySpeed, heading=heading, o3d_bbx=o3d_bbx, ID=id ,label=label)  # added ID because it was missing and caused LDMvis to have ID = None
         self.perception.connected = connected
         if label == 0:
-            maxlen = 4
+            maxlen = 3
         else:
             maxlen = 10
         self.pathHistory = deque([], maxlen=maxlen)
@@ -49,7 +49,7 @@ class LDMentry:
         self.perception = obj
         print(f"PATH HIST: {len(self.pathHistory)} for {obj.id}")
         if self.perception.label == 0:
-            thres = 4
+            thres = 3
         else: 
             thres = 10
         if len(self.pathHistory) >= thres:

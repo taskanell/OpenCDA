@@ -59,10 +59,18 @@ class StaticObstacle(object):
         Bounding box of the osbject vehicle.
     """
 
-    def __init__(self, corner, o3d_bbx):
+    def __init__(self, corner, o3d_bbx,label):
 
         self.bounding_box = BoundingBox(corner)
+        self.location = self.bounding_box.location
         self.o3d_bbx = o3d_bbx
+        self.label = label
+
+    def get_location(self):
+        """
+        Return the location of the object vehicle.
+        """
+        return self.location
 
 
 class TrafficLight(object):
