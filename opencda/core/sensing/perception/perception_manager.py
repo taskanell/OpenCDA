@@ -1143,7 +1143,13 @@ class PerceptionManager:
         num_of_peds = len(list(ped))
         num_of_vehs = len(list(vehicle_list))
         total_actors = num_of_peds+num_of_vehs
+        print(f'Detected objects: {objects["vehicles"]}')
+        det_obj_ids = []
+        for obj in objects['vehicles']:
+            print(f'obj id: {obj.carla_id}, label: {obj.label}')
+            det_obj_ids.append(obj.carla_id)
         num_of_detobj = len(objects['vehicles'])
+
 
         if objects.get('static', []):
             num_of_detobj += len(objects['static']) 
@@ -1151,6 +1157,7 @@ class PerceptionManager:
         FN = 0
 
         # todo: consider the minimum distance to be safer in next version
+        # BUG TO FIX: objects detected might not always be all the items in vehicle_list --> FP=-1
         for v in vehicle_list:
             loc = v.get_location()
             for obstacle_vehicle in objects['vehicles']:
@@ -1170,10 +1177,12 @@ class PerceptionManager:
                         det_ped += 1
                         ped_id = ped[0].id
                         TP+=1
+                        print(f'[1] TP with id {ped_id} pedestrian')
                     else:
-                        if obstacle_vehicle.carla_id == -1:
+                        if obstacle_vehicle.carla_id == -1 and num_of_peds!=0:
                             print(f'already matched ped id {ped_id}')
-                    obstacle_vehicle.set_carla_id(ped[0].id)
+                    if num_of_peds!=0:
+                        obstacle_vehicle.set_carla_id(ped_id)
                     #continue
                 print(f'VALUE X: {abs(loc.x - obstacle_loc.x)}, VALUE Y: {abs(loc.y - obstacle_loc.y)} for {obstacle_vehicle.label}')
                 if abs(loc.x - obstacle_loc.x) <= 3.0 and \
@@ -1192,9 +1201,9 @@ class PerceptionManager:
                             obstacle_vehicle.set_velocity(speed_vector)
 
                     obstacle_vehicle.set_carla_id(v.id)
-                    if v.id not in appended_ids:
+                    if v.id not in appended_ids and v.id in det_obj_ids:
                         appended_ids.append(v.id)
-                        print(f"GIVEN ID {v.id}")
+                        print(f"[2] TP with {v.id} vehicle")
                         TP+=1
         
         if objects.get('static', []):
