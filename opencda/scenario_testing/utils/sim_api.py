@@ -454,7 +454,7 @@ class ScenarioManager:
         while len(self.world.get_actors().filter('vehicle.*')) < len(wanted_keys):
             time.sleep(0.05)
             print(len(self.world.get_actors().filter('vehicle.*')))
-            self.world.tick()
+            #self.world.tick()
             counter += 1
             continue
         print("TOTAL NUMBER OF TICKS UNTIL OVERALL SPAWNING: ", counter)
@@ -467,7 +467,7 @@ class ScenarioManager:
         print("VEHICLES: ",self.world.get_actors().filter('vehicle.*'))
         for actor in self.world.get_actors().filter('vehicle.*'):
             cv += 1
-            if actor.attributes['role_name'] == 'ego' or actor.attributes['role_name'] == 'other_agent' :
+            if actor.attributes['role_name'] == 'ego' or  actor.attributes['role_name'].startswith('other_agent'):
                 
                 manual_control_vehicle = actor
                 counter += 1
