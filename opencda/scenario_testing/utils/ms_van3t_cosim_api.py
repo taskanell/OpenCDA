@@ -44,11 +44,11 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         print("Steplength: " + str(steplength))
 
         # Set up the simulator in synchronous mode
-        settings = self.world.get_settings()
-        print(settings)
-        settings.synchronous_mode = True  # Enables synchronous mode
-        settings.fixed_delta_seconds = steplength
-        self.world.apply_settings(settings)
+        # settings = self.world.get_settings()
+        # print(settings)
+        # settings.synchronous_mode = True  # Enables synchronous mode
+        # settings.fixed_delta_seconds = steplength
+        # self.world.apply_settings(settings)
 
         # Set up the TM in synchronous mode
         ##traffic_manager.set_synchronous_mode(True)
@@ -91,7 +91,11 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         if self.stop_event.is_set():
             self.stop_event.clear()
             return carla_pb2.Boolean(value=False)
-        self.world.tick()
+        #self.world.tick() # OpenCDA should wait for the tick from manual_control
+        while not os.path.exists("/tmp/master_ready.flag"):
+            time.sleep(0.001)
+            continue
+        os.remove("/tmp/master_ready.flag")
         print("ONE TIME STEP EXECUTED")
         self.tick_event.set()
         self.steps += 1
@@ -287,7 +291,6 @@ class CarlaAdapter(carla_pb2_grpc.CarlaAdapterServicer):
         retvalue.rotation.pitch = spawnPoint.rotation.pitch
         retvalue.rotation.yaw = spawnPoint.rotation.yaw
         retvalue.rotation.roll = spawnPoint.rotation.roll
-        print("return")
         return retvalue
 
     def GetActorLDM(self, request, context):
