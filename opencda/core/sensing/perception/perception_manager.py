@@ -833,6 +833,9 @@ class PerceptionManager:
             # calculate the speed. current we retrieve from the server
             # directly.
             # THIS WORKS ONLY FOR ONE CAMERA!!
+            # TODO: check what to showcase as local clasifications (before or after the following confidence and duplicate filtering)
+            # TODO: Give confidence level as a parameter from the ini config file
+            objects['vehicles'] = [item for item in objects['vehicles'] if item.confidence >= 0.7 or (item.label==0 and item.confidence >= 0.35)] #or (item.label==0 and item.confidence>=0.3)] #if (item.confidence >= 0.7) or 
             metrics_dict = self.speed_retrieve_and_classify_metrics(objects)
 
         self.radar_detect(objects)
@@ -852,7 +855,8 @@ class PerceptionManager:
                     (str(i), self.id), rgb_image)
             cv2.waitKey(1)
 
-        objects['vehicles'] = [item for item in objects['vehicles'] if item.confidence >= 0.7 or (item.label==0 and item.confidence >= 0.35)] #or (item.label==0 and item.confidence>=0.3)] #if (item.confidence >= 0.7) or 
+        
+        #objects['vehicles'] = [item for item in objects['vehicles'] if item.confidence >= 0.7 or (item.label==0 and item.confidence >= 0.35)] #or (item.label==0 and item.confidence>=0.3)] #if (item.confidence >= 0.7) or 
         print(f'SENT OBJS: {objects}')
         duplicate_indices = set()
         # Iterate through the objects to check for duplicates
@@ -1119,6 +1123,39 @@ class PerceptionManager:
 
         return rgb_image
 
+
+    def check_for_previous_mindist_object(self, obstacle_vehicle, appended_ids, TP):
+        """
+        Check if the object has a previous min distance object assigned.
+        If yes, assign the previous object with the right after min distance
+        object. If no, decrease the TP as the object is not assigned to any
+        vehicle id.
+
+        Parameters
+        ----------
+        obstacle_vehicle : ObstacleVehicle
+            The detected obstacle vehicle.
+        appended_ids : dict
+            The dictionary that contains the appended vehicle ids given by Carla server.
+        TP : int
+            The number of true positive vehicles.
+        Returns
+        -------
+        TP : int
+            The updated number of true positive vehicles.
+        """
+
+        previous_min_obj = appended_ids[obstacle_vehicle.carla_id][2]
+        if previous_min_obj != -1:
+            print(f'Update id {obstacle_vehicle.carla_id} vehicle with previous min object')
+            appended_ids[obstacle_vehicle.carla_id][1] = previous_min_obj  # assign the previous object with the right after min distance
+            previous_min_obj.set_carla_id(obstacle_vehicle.carla_id) # set the former v.id to the previous object
+        else:
+            print(f'No object currently assigned object to {obstacle_vehicle.carla_id} id vehicle')
+            print("Decreasing TP..")
+            TP-=1
+        return TP
+
     def speed_retrieve_and_classify_metrics(self, objects):
         """
         We don't implement any obstacle speed calculation algorithm.
@@ -1138,16 +1175,16 @@ class PerceptionManager:
                         v.id != self.id]
         # TODO: have a better check for more than one pedestrian
         ped = world.get_actors().filter("walker.pedestrian*")
+        # ped = [v for v in ped if self.dist(v) < 100 and v.id != self.id] # maybe needed in the future, for now i just want to get the ped id
+        ped = [v for v in ped]
+        actor_list = ped + vehicle_list
+        ped_ids = [p.id for p in ped]
         det_ped = 0
-        appended_ids = []
+        appended_ids = {}
         num_of_peds = len(list(ped))
         num_of_vehs = len(list(vehicle_list))
         total_actors = num_of_peds+num_of_vehs
         print(f'Detected objects: {objects["vehicles"]}')
-        det_obj_ids = []
-        for obj in objects['vehicles']:
-            print(f'obj id: {obj.carla_id}, label: {obj.label}')
-            det_obj_ids.append(obj.carla_id)
         num_of_detobj = len(objects['vehicles'])
 
 
@@ -1156,9 +1193,9 @@ class PerceptionManager:
         TP = 0
         FN = 0
 
-        # todo: consider the minimum distance to be safer in next version
-        # BUG TO FIX: objects detected might not always be all the items in vehicle_list --> FP=-1
-        for v in vehicle_list:
+        # todo: consider the minimum distance to be safer in next version (comment by the ms-van3t team)
+        #for v in vehicle_list:
+        for v in actor_list:
             loc = v.get_location()
             for obstacle_vehicle in objects['vehicles']:
                 obstacle_speed = get_speed(obstacle_vehicle)
@@ -1166,12 +1203,12 @@ class PerceptionManager:
                 # has been already matched.
                 # TODO: Investigate if this tactic is efficient. If the vehicle is stable, it would propably return zero speed.
                 # It also adds carla id value with hard coded distance of gt vehicle to detected object (less than 3) --> efficient?
-                if obstacle_speed > 0: 
-                    print(f'already matched {obstacle_vehicle.carla_id}')
-                    continue
+                # if obstacle_speed > 0: 
+                #     print(f'already matched {obstacle_vehicle.carla_id}')
+                #     continue
                 obstacle_loc = obstacle_vehicle.get_location()
                 # TODO : For more than one pedestrian i should have a check too to give id based on distance (i avoid it for now because i get None id values for peds sometimes)
-                if obstacle_vehicle.label == 0:
+                if obstacle_vehicle.label == 0 and v.id in ped_ids:
                     print(f'ped id detected')
                     if det_ped<num_of_peds:
                         det_ped += 1
@@ -1188,6 +1225,10 @@ class PerceptionManager:
                 if abs(loc.x - obstacle_loc.x) <= 3.0 and \
                         abs(loc.y - obstacle_loc.y) <= 3.0:
                     obstacle_vehicle.set_velocity(v.get_velocity())
+                    # temporary solution to avoid comparing ped ids with vehicle objects. TODO: have a better check for more than one pedestrian to assign velocity
+                    if v.id in ped_ids:
+                        continue
+                    dist_sq = (loc.x - obstacle_loc.x) ** 2 + (loc.y - obstacle_loc.y) ** 2
 
                     # the case where the obstacle vehicle is controled by
                     # sumo
@@ -1199,27 +1240,52 @@ class PerceptionManager:
                             # todo: consider the yaw angle in the future
                             speed_vector = carla.Vector3D(sumo_speed, 0, 0)
                             obstacle_vehicle.set_velocity(speed_vector)
+                    #if obstacle_vehicle.carla_id != -1:
+                    if obstacle_vehicle.label == 1:
 
-                    obstacle_vehicle.set_carla_id(v.id)
-                    if v.id not in appended_ids and v.id in det_obj_ids:
-                        appended_ids.append(v.id)
-                        print(f"[2] TP with {v.id} vehicle")
-                        TP+=1
+                        if v.id not in appended_ids: 
+                            #appended_ids.append(v.id)
+                            #obstacle_vehicle.set_carla_id(v.id)
+                            if obstacle_vehicle.carla_id != -1:
+                                if appended_ids[obstacle_vehicle.carla_id][0] > dist_sq:
+                                    print(f'Assigning current id {v.id} vehicle to already assigned object')
+                                    TP = self.check_for_previous_mindist_object(obstacle_vehicle, appended_ids, TP)
+                                else: 
+                                    continue
+                            appended_ids[v.id] = (dist_sq,obstacle_vehicle,-1)
+                            print(f"[2] TP with {v.id} vehicle")
+                            TP+=1
+
+                        # if the distance is smaller than the previous detected, then update the min distance and object assigned to this v.id
+                        if dist_sq < appended_ids[v.id][0]:
+                            if obstacle_vehicle.carla_id != -1:
+                                print(f'Assigning current id {v.id} vehicle to already assigned object')
+                                TP = self.check_for_previous_mindist_object(obstacle_vehicle, appended_ids, TP)
+                            # keep the previous object with the right after min distance
+                            # and update the min distance and object assigned to this v.id
+                            appended_ids[v.id] = (dist_sq,obstacle_vehicle,appended_ids[v.id][1]) 
+
+            if v.id in appended_ids:       
+                appended_ids[v.id][1].set_carla_id(v.id)
+
+        print(f'APPENDED IDS: {appended_ids.keys()}')
         
+        # check it the static (non ped or veh actors) objects are misperceived as vehicles or pedestrians
         if objects.get('static', []):
             print(f"static obj: {len(objects['static'])}")
             for v in vehicle_list:
                 if v.id not in appended_ids:
+                    loc = v.get_location()
                     for obstacle_vehicle in objects['static']:
                             obstacle_loc = obstacle_vehicle.get_location()
                             if abs(loc.x - obstacle_loc.x) <= 3.0 and \
                             abs(loc.y - obstacle_loc.y) <= 3.0:
-                                print(f'Object with label {obstacle_vehicle.label} FN')
-                                FN += 1
+                                print(f'Object with label {obstacle_vehicle.label} FP')
+                                TP -= 1
 
         
-        print(f'FP:{num_of_detobj-TP}, TP:{TP}, FN:{FN}, TotalDetections:{num_of_detobj}, TotalActors:{total_actors}')
-        return {'TP': TP, 'FP': num_of_detobj-TP, 'FN': FN, 'TotalDetections':num_of_detobj, 'TotalActors':total_actors}
+        print(f'FP:{num_of_detobj-TP}, TP:{TP}, FN:{total_actors-TP}, TotalDetections:{num_of_detobj}, TotalActors:{total_actors}')
+        return {'TP': TP, 'FP': num_of_detobj-TP, 'FN': total_actors-TP, 'TotalDetections':num_of_detobj, 'TotalActors':total_actors}
                       
 
     def retrieve_traffic_lights(self, objects):
